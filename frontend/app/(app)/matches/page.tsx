@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { MatchCard, type Match } from "@/components/dashboard/match-card"
-import { Search, Filter, SlidersHorizontal, ChevronDown, MapPin, Target, Zap, ArrowUpDown } from "lucide-react"
+import { Search, Filter, SlidersHorizontal, ChevronDown, MapPin, Target, Zap, ArrowUpDown, Bell } from "lucide-react"
 
 const allMatches: Match[] = [
   {
@@ -67,109 +67,74 @@ const allMatches: Match[] = [
 
 export default function MatchesPage() {
   const [search, setSearch] = useState("")
+  const [dealTypeFilter, setDealTypeFilter] = useState("ALL")
+  const [industryFilter, setIndustryFilter] = useState("ALL")
+
+  const filteredMatches = allMatches.filter(match => {
+    const matchesSearch = match.name.toLowerCase().includes(search.toLowerCase()) || 
+                          match.industry.toLowerCase().includes(search.toLowerCase())
+    const matchesDealType = dealTypeFilter === "ALL" || match.dealType.toUpperCase() === dealTypeFilter
+    const matchesIndustry = industryFilter === "ALL" || match.industry.toUpperCase() === industryFilter
+    
+    return matchesSearch && matchesDealType && matchesIndustry
+  })
 
   return (
     <div className="space-y-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight italic mb-2">Matches</h1>
-          <p className="text-slate-500 dark:text-white/40 font-medium text-sm uppercase tracking-widest font-black">Find your next strategic partner</p>
+          <p className="text-slate-500 dark:text-white/40 font-medium text-sm uppercase tracking-widest font-black">All businesses that match your intent profile</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" className="rounded-xl border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[10px] h-12 px-6">
-            <ArrowUpDown className="h-4 w-4 mr-2" />
-            Sort: Highest Match
-          </Button>
-          <Button className="bg-primary text-white rounded-xl font-black uppercase tracking-widest text-[10px] h-12 px-8 shadow-lg shadow-primary/20">
-            Export Results
-          </Button>
-        </div>
-      </div>
-
-      {/* Search and Filters Panel */}
-      <div className="grid lg:grid-cols-4 gap-8">
-        {/* Filters Panel */}
-        <div className="lg:col-span-1 space-y-6">
-           <div className="p-8 rounded-[2rem] bg-white dark:bg-[#0A0A0A] border border-slate-200 dark:border-white/5 space-y-8 sticky top-28">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-black text-slate-900 dark:text-white italic tracking-tight">Filters</h3>
-                <button className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline">Reset</button>
-              </div>
-              
-              <div className="space-y-6">
-                 <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Industry</label>
-                    <select className="w-full bg-slate-50 dark:bg-white/5 border-none rounded-xl h-10 px-3 text-xs font-bold text-slate-700 dark:text-slate-300">
-                       <option>All Industries</option>
-                       <option>SaaS</option>
-                       <option>Fintech</option>
-                       <option>Healthcare</option>
-                    </select>
-                 </div>
-
-                 <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Deal Type</label>
-                    <div className="grid grid-cols-2 gap-2">
-                       {['Client', 'Partnership', 'Vendor', 'Investment'].map(type => (
-                         <button key={type} className="px-3 py-2 rounded-lg bg-slate-50 dark:bg-white/5 text-[10px] font-black uppercase tracking-widest text-slate-500 border border-transparent hover:border-primary/20 transition-all">
-                           {type}
-                         </button>
-                       ))}
-                    </div>
-                 </div>
-
-                 <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Match Score %</label>
-                    <input type="range" className="w-full accent-primary" min="50" max="100" defaultValue="80" />
-                    <div className="flex justify-between text-[10px] font-black text-slate-400">
-                       <span>50%</span>
-                       <span>100%</span>
-                    </div>
-                 </div>
-
-                 <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Location</label>
-                    <Input placeholder="Global" className="bg-slate-50 dark:bg-white/5 border-none rounded-xl h-10 text-xs font-bold" />
-                 </div>
-              </div>
-
-              <Button className="w-full bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-black uppercase tracking-widest text-[10px] h-12">
-                Apply Filters
-              </Button>
-           </div>
-        </div>
-
-        {/* Search and Results */}
-        <div className="lg:col-span-3 space-y-8">
-           <div className="relative">
-              <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+        
+        <div className="flex items-center gap-4 flex-grow max-w-md md:justify-end">
+           <div className="relative flex-grow max-w-[320px]">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input 
-                placeholder="Search by company name, industry, or specific business need..." 
-                className="pl-16 h-16 bg-white dark:bg-[#0A0A0A] border-slate-200 dark:border-white/5 rounded-[2rem] font-bold text-lg shadow-xl shadow-slate-100 dark:shadow-none focus-visible:ring-primary/20 transition-all"
+                placeholder="Search matches..." 
+                className="pl-12 h-12 bg-slate-100 dark:bg-white/5 border-none rounded-2xl font-bold text-sm"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
            </div>
-
-           <div className="flex items-center justify-between px-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Showing {allMatches.length} Strategic Matches</span>
-              <div className="flex gap-2">
-                 <button className="h-8 w-8 rounded-lg bg-white dark:bg-[#0A0A0A] border border-slate-200 dark:border-white/5 flex items-center justify-center text-primary shadow-sm"><Filter className="h-4 w-4" /></button>
-                 <button className="h-8 w-8 rounded-lg bg-white dark:bg-[#0A0A0A] border border-slate-200 dark:border-white/5 flex items-center justify-center text-slate-400 shadow-sm"><SlidersHorizontal className="h-4 w-4" /></button>
-              </div>
-           </div>
-
-           <div className="grid gap-6">
-             {allMatches.map((match) => (
-               <MatchCard key={match.id} match={match} onRequestIntro={() => {}} />
-             ))}
-           </div>
-           
-           <Button variant="ghost" className="w-full h-16 rounded-[2rem] border-2 border-dashed border-slate-200 dark:border-white/5 text-slate-400 font-black uppercase tracking-widest text-xs hover:border-primary/50 hover:text-primary transition-all">
-             Load More Opportunities
-           </Button>
+           <button className="h-12 w-12 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center text-slate-400 hover:text-primary transition-all">
+              <Bell className="h-5 w-5" />
+           </button>
         </div>
       </div>
+
+      {/* Filters Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="outline" className="h-10 px-6 rounded-xl border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[10px] flex items-center gap-2 hover:border-primary/50 transition-all">
+             Deal Type <ChevronDown className="h-3 w-3" />
+          </Button>
+          <Button variant="outline" className="h-10 px-6 rounded-xl border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[10px] flex items-center gap-2 hover:border-primary/50 transition-all">
+             Industry <ChevronDown className="h-3 w-3" />
+          </Button>
+          <Button variant="outline" className="h-10 px-6 rounded-xl border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[10px] flex items-center gap-2 hover:border-primary/50 transition-all">
+             Score: 70%+ <ChevronDown className="h-3 w-3" />
+          </Button>
+        </div>
+        
+        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+           {filteredMatches.length} Companies Found
+        </div>
+      </div>
+
+      {/* Grid of Results */}
+      <div className="grid md:grid-cols-2 gap-8">
+        {filteredMatches.map((match) => (
+          <MatchCard key={match.id} match={match} onRequestIntro={() => {}} />
+        ))}
+      </div>
+      
+      {filteredMatches.length === 0 && (
+        <div className="py-20 text-center">
+          <p className="text-slate-400 font-black uppercase tracking-widest text-sm">No matches found for your criteria</p>
+        </div>
+      )}
     </div>
   )
 }
+

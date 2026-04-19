@@ -77,35 +77,6 @@ export default function DashboardPage() {
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-10">
           
-          {/* Active Deal Flow */}
-          <section className="space-y-6">
-             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight italic">Active Deal Flow</h2>
-              <Link href="/requests" className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline">View All</Link>
-            </div>
-            <div className="grid gap-4">
-               {[
-                 { title: "Cloud Migration Strategy", partner: "TechFlow Solutions", status: "In Negotiation", value: "$120k", type: "Partnership" },
-                 { title: "Enterprise API Integration", partner: "Global Systems", status: "Discovery", value: "$45k", type: "Client" },
-               ].map((deal, i) => (
-                 <div key={i} className="p-6 rounded-2xl bg-white dark:bg-[#0A0A0A] border border-slate-200 dark:border-white/5 flex items-center justify-between hover:border-primary/20 transition-all cursor-pointer group">
-                    <div className="flex items-center gap-4">
-                       <div className="h-12 w-12 rounded-xl bg-slate-50 dark:bg-white/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
-                          <TrendingUp className="h-6 w-6 text-primary group-hover:text-white" />
-                       </div>
-                       <div>
-                          <h4 className="font-black text-slate-900 dark:text-white">{deal.title}</h4>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">With {deal.partner} • {deal.type}</p>
-                       </div>
-                    </div>
-                    <div className="text-right flex flex-col items-end">
-                       <Badge className="bg-emerald-500/10 text-emerald-500 border-none uppercase text-[8px] font-black tracking-widest mb-1">{deal.status}</Badge>
-                       <span className="block text-xs font-black text-slate-900 dark:text-white">{deal.value}</span>
-                    </div>
-                 </div>
-               ))}
-            </div>
-          </section>
 
           {/* Suggested Matches */}
           <section className="space-y-6">
@@ -123,24 +94,36 @@ export default function DashboardPage() {
 
         {/* Sidebar */}
         <div className="space-y-8">
-           {/* Recent Activity */}
+           {/* Profile Completion */}
            <Card className="p-8 bg-white dark:bg-[#0A0A0A] border-slate-200 dark:border-white/5 rounded-[2rem]">
-              <h3 className="text-lg font-black text-slate-900 dark:text-white mb-6 tracking-tight italic">Recent Activity</h3>
-              <div className="space-y-6">
-                 {recentActivity.map((activity) => (
-                   <div key={activity.id} className="flex gap-4 group cursor-pointer">
-                      <div className="h-10 w-10 rounded-xl bg-slate-50 dark:bg-white/5 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-all">
-                         <activity.icon className="h-4 w-4 text-slate-400 group-hover:text-primary transition-colors" />
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight italic">Profile Completion</h3>
+                <span className="text-2xl font-black text-primary italic">60%</span>
+              </div>
+              
+              <div className="w-full h-2 bg-slate-100 dark:bg-white/5 rounded-full mb-8 overflow-hidden">
+                <div className="h-full bg-primary rounded-full" style={{ width: '60%' }} />
+              </div>
+
+              <div className="space-y-4 mb-8">
+                 {[
+                   { label: "Basic Information", completed: true },
+                   { label: "Business Details", completed: true },
+                   { label: "What You Offer", completed: true },
+                   { label: "What You Need", completed: false },
+                   { label: "Verification", completed: false },
+                 ].map((item, i) => (
+                   <div key={i} className={`flex items-center gap-3 ${item.completed ? 'text-slate-900 dark:text-white' : 'text-slate-300 dark:text-white/20'}`}>
+                      <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${item.completed ? 'border-primary bg-primary/10 text-primary' : 'border-slate-200 dark:border-white/10'}`}>
+                         {item.completed ? <CheckCircle2 className="h-3 w-3" /> : <div className="h-2 w-2 rounded-full" />}
                       </div>
-                      <div className="space-y-1">
-                         <p className="text-sm font-bold text-slate-700 dark:text-slate-300 leading-tight group-hover:text-slate-900 dark:group-hover:text-white transition-colors">{activity.content}</p>
-                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{activity.time}</p>
-                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest">{item.label}</span>
                    </div>
                  ))}
               </div>
-              <Button variant="ghost" className="w-full mt-8 rounded-xl font-black uppercase tracking-widest text-[8px] text-slate-400 hover:text-primary transition-all">
-                 View Full History <ArrowRight className="h-3 w-3 ml-2" />
+
+              <Button className="w-full bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-900 dark:text-white border-none rounded-xl font-black uppercase tracking-widest text-[10px] h-12 transition-all">
+                 Complete Profile <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
            </Card>
 
