@@ -80,50 +80,50 @@ export default function MatchesPage() {
   })
 
   return (
-    <div className="space-y-10">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight italic mb-2">Matches</h1>
-          <p className="text-slate-500 dark:text-white/40 font-medium text-sm uppercase tracking-widest font-black">All businesses that match your intent profile</p>
+          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight italic mb-1">Matches</h1>
+          <p className="text-slate-500 dark:text-white/40 font-medium text-xs uppercase tracking-widest font-black">All businesses that match your intent profile</p>
         </div>
         
-        <div className="flex items-center gap-4 flex-grow max-w-md md:justify-end">
-           <div className="relative flex-grow max-w-[320px]">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+           <div className="relative flex-grow sm:flex-grow-0 sm:w-[240px]">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input 
                 placeholder="Search matches..." 
-                className="pl-12 h-12 bg-slate-100 dark:bg-white/5 border-none rounded-2xl font-bold text-sm"
+                className="pl-11 h-11 bg-slate-100 dark:bg-white/5 border-none rounded-2xl font-bold text-sm w-full"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
            </div>
-           <button className="h-12 w-12 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center text-slate-400 hover:text-primary transition-all">
-              <Bell className="h-5 w-5" />
+           <button className="h-11 w-11 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center text-slate-400 hover:text-primary transition-all flex-shrink-0">
+              <Bell className="h-4 w-4" />
            </button>
         </div>
       </div>
 
       {/* Filters Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="outline" className="h-10 px-6 rounded-xl border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[10px] flex items-center gap-2 hover:border-primary/50 transition-all">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" className="h-9 px-4 rounded-xl border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[9px] flex items-center gap-1.5 hover:border-primary/50 transition-all">
              Deal Type <ChevronDown className="h-3 w-3" />
           </Button>
-          <Button variant="outline" className="h-10 px-6 rounded-xl border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[10px] flex items-center gap-2 hover:border-primary/50 transition-all">
+          <Button variant="outline" className="h-9 px-4 rounded-xl border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[9px] flex items-center gap-1.5 hover:border-primary/50 transition-all">
              Industry <ChevronDown className="h-3 w-3" />
           </Button>
-          <Button variant="outline" className="h-10 px-6 rounded-xl border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[10px] flex items-center gap-2 hover:border-primary/50 transition-all">
+          <Button variant="outline" className="h-9 px-4 rounded-xl border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[9px] flex items-center gap-1.5 hover:border-primary/50 transition-all">
              Score: 70%+ <ChevronDown className="h-3 w-3" />
           </Button>
         </div>
         
-        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+        <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">
            {filteredMatches.length} Companies Found
         </div>
       </div>
 
       {/* Grid of Results */}
-      <div className="grid md:grid-cols-2 gap-8">
+      <div className="grid sm:grid-cols-2 gap-5">
         {filteredMatches.map((match) => (
           <MatchCard key={match.id} match={match} onRequestIntro={() => {}} />
         ))}
