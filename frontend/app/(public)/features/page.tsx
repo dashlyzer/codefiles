@@ -1,69 +1,103 @@
-import { Badge } from "@/components/ui/badge"
-import { Shield, Zap, Target, Users, BarChart3, Lock } from "lucide-react"
+"use client"
 
-const features = [
+import { 
+  Zap, ShieldCheck, Target, Users, BarChart3, 
+  MessageSquare, Calendar, Globe, Sparkles, Rocket
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
+
+const FEATURES = [
   {
-    icon: Shield,
-    title: "Identity Verification",
-    description: "Every entity on Taplyzer is manually verified to prevent fraud and ensure high-quality interactions."
+    title: "AI Match Discovery",
+    desc: "Our neural engine scans thousands of business intents to find the top 1% alignment for your specific needs.",
+    icon: Sparkles,
+    color: "bg-blue-500"
   },
   {
-    icon: Zap,
-    title: "Instant Matching",
-    description: "As soon as you post your intent, our engine works in the background to find compatible partners."
+    title: "Verified Trust Network",
+    desc: "Multi-factor business verification ensures you only connect with legitimate, high-intent organizations.",
+    icon: ShieldCheck,
+    color: "bg-emerald-500"
   },
   {
+    title: "Intent Tracking",
+    desc: "Real-time deal flow monitoring. Know exactly when a partner is ready to engage in your specific deal type.",
     icon: Target,
-    title: "Strategic Filters",
-    description: "Filter matches by deal size, industry focus, geographical reach, and specific technology requirements."
+    color: "bg-primary"
   },
   {
-    icon: Users,
-    title: "Secure Intros",
-    description: "Connect via a managed introduction system that protects your privacy until mutual interest is confirmed."
+    title: "Direct Intro Requests",
+    desc: "Skip the cold emails. Request introductions directly from the dashboard and get responses within hours.",
+    icon: MessageSquare,
+    color: "bg-purple-500"
   },
   {
+    title: "Unified Scheduler",
+    desc: "Seamlessly move from introduction to video call. Integrated calendar for zero-friction deal making.",
+    icon: Calendar,
+    color: "bg-amber-500"
+  },
+  {
+    title: "Growth Analytics",
+    desc: "Deep insights into your networking performance, match velocity, and strategic outreach success rates.",
     icon: BarChart3,
-    title: "Analytics Dashboard",
-    description: "Track the performance of your intents and see how your profile ranks in the global marketplace."
-  },
-  {
-    icon: Lock,
-    title: "Data Sovereignty",
-    description: "Your business data is encrypted and you maintain full control over who sees your detailed intents."
+    color: "bg-slate-900"
   }
 ]
 
 export default function FeaturesPage() {
   return (
-    <div className="pt-32 pb-24">
-      <section className="px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="text-center max-w-3xl mx-auto mb-20">
-          <Badge className="bg-primary/10 text-primary border-none mb-6 px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest">
-            Core Capabilities
-          </Badge>
-          <h1 className="text-5xl md:text-7xl font-black text-slate-900 dark:text-white tracking-tight mb-8">
-            Powering <span className="text-primary italic">High-Stakes</span> Deals.
-          </h1>
-          <p className="text-xl text-slate-600 dark:text-slate-400 font-medium">
-            Discover the tools that make Taplyzer the most efficient platform for business networking.
-          </p>
+    <div className="py-24 space-y-32">
+      {/* Hero */}
+      <div className="max-w-4xl mx-auto text-center space-y-8 px-4">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px] font-black uppercase tracking-widest">
+           <Zap className="h-3 w-3 fill-primary" /> The Future of B2B
         </div>
+        <h1 className="text-5xl md:text-8xl font-black text-slate-900 dark:text-white tracking-tighter italic leading-[0.9]">
+          Platform <span className="text-primary">Capabilities.</span>
+        </h1>
+        <p className="text-xl font-medium text-slate-500 max-w-2xl mx-auto italic">
+          Everything you need to discover, verify, and close strategic business partnerships at global scale.
+        </p>
+      </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
-          {features.map((f, i) => (
-            <div key={i} className="p-8 rounded-3xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 hover:border-primary/50 transition-all group">
-              <div className="h-14 w-14 rounded-2xl bg-white dark:bg-slate-900 shadow-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <f.icon className="h-7 w-7 text-primary" />
-              </div>
-              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-4 italic tracking-tight">{f.title}</h3>
-              <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed text-sm">
-                {f.description}
-              </p>
+      {/* Grid */}
+      <div className="max-w-7xl mx-auto px-4 grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {FEATURES.map(feat => (
+          <div key={feat.title} className="group p-10 rounded-[3rem] bg-white dark:bg-[#0A0A0A] border border-slate-200 dark:border-white/10 hover:border-primary/50 transition-all duration-500 shadow-xl shadow-slate-100/50 dark:shadow-none hover:shadow-2xl hover:shadow-primary/5">
+             <div className={`h-16 w-16 rounded-[1.5rem] ${feat.color} text-white flex items-center justify-center mb-8 shadow-lg transition-transform group-hover:scale-110 group-hover:rotate-3`}>
+                <feat.icon className="h-8 w-8" />
+             </div>
+             <h3 className="text-2xl font-black text-slate-900 dark:text-white italic tracking-tight mb-4">{feat.title}</h3>
+             <p className="text-slate-500 font-medium leading-relaxed italic">{feat.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* CTA Section */}
+      <div className="max-w-7xl mx-auto px-4">
+         <div className="bg-slate-900 dark:bg-primary rounded-[4rem] p-12 md:p-24 overflow-hidden relative shadow-2xl shadow-primary/30">
+            <div className="absolute top-0 right-0 p-24 opacity-10 rotate-12 scale-150">
+               <Rocket className="h-96 w-96 text-white" />
             </div>
-          ))}
-        </div>
-      </section>
+            <div className="relative z-10 max-w-2xl space-y-10 text-center md:text-left">
+               <h2 className="text-4xl md:text-6xl font-black text-white italic tracking-tighter leading-tight">Ready to activate your strategic network?</h2>
+               <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
+                  <Link href="/auth?mode=signup">
+                    <Button className="h-16 px-12 rounded-2xl bg-white text-slate-900 hover:bg-slate-100 font-black uppercase tracking-widest text-xs shadow-xl">
+                       Start Free Trial
+                    </Button>
+                  </Link>
+                  <Link href="/pricing">
+                    <Button variant="outline" className="h-16 px-12 rounded-2xl border-white/20 text-white hover:bg-white/10 font-black uppercase tracking-widest text-xs">
+                       View Pricing
+                    </Button>
+                  </Link>
+               </div>
+            </div>
+         </div>
+      </div>
     </div>
   )
 }

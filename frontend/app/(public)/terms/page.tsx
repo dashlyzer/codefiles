@@ -1,47 +1,58 @@
-import { Badge } from "@/components/ui/badge"
+"use client"
 
-export default function TermsPage() {
+import { FileText, ShieldAlert, Scale, Globe, Clock, CheckCircle2 } from "lucide-react"
+
+export default function TermsOfServicePage() {
   return (
-    <div className="pt-32 pb-24">
-      <section className="px-6 lg:px-8 max-w-4xl mx-auto">
-        <Badge className="bg-primary/10 text-primary border-none mb-6 px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest">
-          Legal
-        </Badge>
-        <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tight mb-8">
-          Terms of <span className="text-primary italic">Service</span>.
-        </h1>
-        <div className="prose prose-slate dark:prose-invert max-w-none text-slate-600 dark:text-slate-400 font-medium leading-relaxed space-y-8">
-          <p className="text-lg">Effective Date: April 18, 2026</p>
-          
-          <section>
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-4">1. Acceptance of Terms</h2>
-            <p>
-              By accessing or using Taplyzer, you agree to be bound by these Terms of Service. If you do not agree to these terms, you may not use our platform. These terms apply to all visitors, users, and businesses who access our services.
-            </p>
-          </section>
+    <div className="py-24 max-w-4xl mx-auto px-4 space-y-16">
+      <div className="text-center space-y-4">
+        <h1 className="text-5xl md:text-7xl font-black text-slate-900 dark:text-white tracking-tighter italic">Terms of <span className="text-primary">Service.</span></h1>
+        <p className="text-slate-500 font-black uppercase tracking-[0.3em] text-[10px] flex items-center justify-center gap-2">
+           <Clock className="h-3.5 w-3.5" /> Effective: April 2024
+        </p>
+      </div>
 
-          <section>
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-4">2. Platform Purpose</h2>
-            <p>
-              Taplyzer is a platform for business networking and deal-making. Users must provide accurate business information and act with integrity. Spam, fraud, and misrepresentation of intent are strictly prohibited and will result in immediate account termination.
+      <div className="bg-white dark:bg-[#0A0A0A] border border-slate-200 dark:border-white/10 rounded-[3rem] p-10 md:p-16 space-y-10 shadow-sm">
+         <section className="space-y-4">
+            <h2 className="text-2xl font-black italic tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+               <Scale className="h-6 w-6 text-primary" /> 1. Acceptance of Terms
+            </h2>
+            <p className="text-slate-500 font-medium leading-relaxed italic">
+               By accessing or using the Taplyzer platform, you agree to be bound by these Terms of Service. If you do not agree to these terms, you may not use our services.
             </p>
-          </section>
+         </section>
 
-          <section>
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-4">3. Verification Requirements</h2>
-            <p>
-              To maintain a high-trust environment, users must complete our verification process. We reserve the right to deny access to any individual or business that fails to meet our verification standards.
+         <section className="space-y-4">
+            <h2 className="text-2xl font-black italic tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+               <ShieldAlert className="h-6 w-6 text-primary" /> 2. Eligibility & Verification
+            </h2>
+            <p className="text-slate-500 font-medium leading-relaxed italic">
+               The platform is intended for use by legitimate business entities. You represent that you have the authority to bind your organization to these terms. All accounts are subject to our verification process.
             </p>
-          </section>
+         </section>
 
-          <section>
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-4">4. Limitation of Liability</h2>
-            <p>
-              Taplyzer provides the platform to facilitate introductions and deal-making. We are not a party to any transactions between users and are not responsible for the outcome of any business deals initiated on the platform.
+         <section className="space-y-4">
+            <h2 className="text-2xl font-black italic tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+               <Globe className="h-6 w-6 text-primary" /> 3. Prohibited Conduct
+            </h2>
+            <p className="text-slate-500 font-medium leading-relaxed italic">
+               You agree not to use the platform for any illegal purpose, to spam other users, or to provide false information during the verification process. Taplyzer reserves the right to terminate any account that violates these standards.
             </p>
-          </section>
-        </div>
-      </section>
+         </section>
+
+         <section className="space-y-4">
+            <h2 className="text-2xl font-black italic tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+               <FileText className="h-6 w-6 text-primary" /> 4. Limitation of Liability
+            </h2>
+            <p className="text-slate-500 font-medium leading-relaxed italic">
+               Taplyzer provides a platform for business introductions. We are not responsible for the outcome of any deals, partnerships, or agreements made between users of the platform.
+            </p>
+         </section>
+      </div>
+
+      <div className="text-center">
+         <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Legal concerns? Reach our legal team at <span className="text-primary">legal@taplyzer.io</span></p>
+      </div>
     </div>
   )
 }

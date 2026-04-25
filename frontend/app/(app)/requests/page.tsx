@@ -4,21 +4,26 @@ import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { MessageSquare, Clock, CheckCircle2, XCircle, ArrowRight, User, Check, X } from "lucide-react"
+import Link from "next/link"
+import { MessageSquare, Clock, CheckCircle2, XCircle, ArrowRight, User, Check, X, Calendar } from "lucide-react"
+import { DealFlowStepper } from "@/components/deal/deal-flow-stepper"
 
 export default function RequestsPage() {
   const [activeTab, setActiveTab] = useState("received")
-
-  const receivedRequests = [
+  const [receivedRequests, setReceivedRequests] = useState([
     { id: 1, company: "Acme Corp", message: "We're very interested in your recent intent regarding AI infrastructure and would love to discuss a potential partnership.", status: "Pending", match: "96%", time: "2 hours ago" },
     { id: 2, company: "BuildIt Ltd", message: "Your expertise in cloud scaling matches our current project needs. Let's explore how we can work together.", status: "Pending", match: "91%", time: "5 hours ago" },
     { id: 3, company: "Nexus Systems", message: "Interested in your supply chain solution for our East Coast operations.", status: "Accepted", match: "88%", time: "1 day ago" },
-  ]
+  ])
 
-  const sentRequests = [
+  const [sentRequests, setSentRequests] = useState([
     { id: 4, company: "Xenia Soft", message: "We saw your offer for strategic investment and would like to share our current performance metrics.", status: "Pending", match: "94%", time: "Sent 2 days ago" },
     { id: 5, company: "Y-Combinator", message: "Requesting an introduction regarding your portfolio's infrastructure needs.", status: "Rejected", match: "89%", time: "Sent 1 week ago" },
-  ]
+  ])
+
+  const handleAction = (id: number, action: 'Accepted' | 'Rejected') => {
+    setReceivedRequests(prev => prev.map(r => r.id === id ? { ...r, status: action } : r))
+  }
 
   return (
     <div className="space-y-10">
@@ -52,26 +57,36 @@ export default function RequestsPage() {
                       <p className="text-slate-500 dark:text-white/60 text-sm font-medium italic max-w-xl leading-relaxed">"{r.message}"</p>
                       <div className="flex items-center gap-6 text-[10px] font-black uppercase tracking-widest text-slate-400">
                          <span className="flex items-center gap-2 bg-slate-50 dark:bg-white/5 px-3 py-1 rounded-lg"><Clock className="h-3 w-3" /> {r.time}</span>
-                         {r.status === 'Accepted' ? (
-                            <span className="flex items-center gap-2 text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-lg"><CheckCircle2 className="h-3 w-3" /> Accepted</span>
-                         ) : r.status === 'Rejected' ? (
-                            <span className="flex items-center gap-2 text-red-500 bg-red-500/10 px-3 py-1 rounded-lg"><XCircle className="h-3 w-3" /> Rejected</span>
-                         ) : (
-                            <span className="flex items-center gap-2 text-amber-500 bg-amber-500/10 px-3 py-1 rounded-lg"><Clock className="h-3 w-3" /> Pending</span>
-                         )}
+                         <DealFlowStepper status={r.status as any} />
                       </div>
                    </div>
                 </div>
-                {r.status === 'Pending' && (
-                   <div className="flex gap-4">
-                      <Button variant="outline" className="rounded-xl border-slate-200 dark:border-white/10 text-red-500 font-black uppercase tracking-widest text-[10px] h-14 px-8 hover:bg-red-500/10 transition-all flex items-center gap-2">
-                         <X className="h-4 w-4" /> Reject
+                
+                <div className="flex gap-4">
+                  {r.status === 'Pending' ? (
+                     <>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => handleAction(r.id, 'Rejected')}
+                          className="rounded-xl border-slate-200 dark:border-white/10 text-red-500 font-black uppercase tracking-widest text-[10px] h-14 px-8 hover:bg-red-500/10 transition-all flex items-center gap-2"
+                        >
+                           <X className="h-4 w-4" /> Reject
+                        </Button>
+                        <Button 
+                          onClick={() => handleAction(r.id, 'Accepted')}
+                          className="bg-primary text-white rounded-xl font-black uppercase tracking-widest text-[10px] h-14 px-10 shadow-xl shadow-primary/20 group-hover:scale-105 transition-all flex items-center gap-2"
+                        >
+                           <Check className="h-4 w-4" /> Accept Intro
+                        </Button>
+                     </>
+                  ) : r.status === 'Accepted' ? (
+                    <Link href={`/meetings?schedule=true&partner=${r.company}`}>
+                      <Button className="bg-emerald-500 text-white rounded-xl font-black uppercase tracking-widest text-[10px] h-14 px-10 shadow-xl shadow-emerald-500/20 group-hover:scale-105 transition-all flex items-center gap-2">
+                        <Calendar className="h-4 w-4" /> Schedule Meeting
                       </Button>
-                      <Button className="bg-primary text-white rounded-xl font-black uppercase tracking-widest text-[10px] h-14 px-10 shadow-xl shadow-primary/20 group-hover:scale-105 transition-all flex items-center gap-2">
-                         <Check className="h-4 w-4" /> Accept Intro
-                      </Button>
-                   </div>
-                )}
+                    </Link>
+                  ) : null}
+                </div>
              </div>
            ))}
         </TabsContent>

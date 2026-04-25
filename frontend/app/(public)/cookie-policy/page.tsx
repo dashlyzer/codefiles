@@ -1,49 +1,67 @@
-import { Badge } from "@/components/ui/badge"
+"use client"
+
+import { Cookie, ShieldCheck, Settings, Eye, Clock, CheckCircle2 } from "lucide-react"
 
 export default function CookiePolicyPage() {
   return (
-    <div className="pt-32 pb-24">
-      <section className="px-6 lg:px-8 max-w-4xl mx-auto">
-        <Badge className="bg-primary/10 text-primary border-none mb-6 px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest">
-          Legal
-        </Badge>
-        <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tight mb-8">
-          Cookie <span className="text-primary italic">Policy</span>.
-        </h1>
-        <div className="prose prose-slate dark:prose-invert max-w-none text-slate-600 dark:text-slate-400 font-medium leading-relaxed space-y-8">
-          <p className="text-lg">Last Updated: April 18, 2026</p>
-          
-          <section>
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-4">1. What are Cookies?</h2>
-            <p>
-              Cookies are small text files that are stored on your device when you visit a website. They help us remember your preferences, keep you logged in, and understand how you use our platform.
-            </p>
-          </section>
+    <div className="py-24 max-w-4xl mx-auto px-4 space-y-16">
+      <div className="text-center space-y-4">
+        <h1 className="text-5xl md:text-7xl font-black text-slate-900 dark:text-white tracking-tighter italic">Cookie <span className="text-primary">Policy.</span></h1>
+        <p className="text-slate-500 font-black uppercase tracking-[0.3em] text-[10px] flex items-center justify-center gap-2">
+           <Clock className="h-3.5 w-3.5" /> Effective: April 2024
+        </p>
+      </div>
 
-          <section>
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-4">2. How We Use Cookies</h2>
-            <p>
-              We use essential cookies to maintain your session and ensure platform security. We also use analytical cookies to understand user behavior and improve our matchmaking algorithms. We do not use third-party tracking cookies for advertising.
+      <div className="bg-white dark:bg-[#0A0A0A] border border-slate-200 dark:border-white/10 rounded-[3rem] p-10 md:p-16 space-y-10 shadow-sm">
+         <section className="space-y-4">
+            <h2 className="text-2xl font-black italic tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+               <Cookie className="h-6 w-6 text-primary" /> 1. What are Cookies?
+            </h2>
+            <p className="text-slate-500 font-medium leading-relaxed italic">
+               Cookies are small text files stored on your device that help us provide a better experience. They allow us to remember your login state, theme preferences, and platform settings across sessions.
             </p>
-          </section>
+         </section>
 
-          <section>
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-4">3. Types of Cookies We Use</h2>
-            <ul className="list-disc pl-6 space-y-2">
-              <li><strong>Essential:</strong> Required for account login and basic platform functionality.</li>
-              <li><strong>Functional:</strong> Remember your preferences and dashboard settings.</li>
-              <li><strong>Analytical:</strong> Help us measure platform performance and match accuracy.</li>
+         <section className="space-y-4">
+            <h2 className="text-2xl font-black italic tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+               <Settings className="h-6 w-6 text-primary" /> 2. How We Use Them
+            </h2>
+            <p className="text-slate-500 font-medium leading-relaxed italic">
+               We use cookies for essential functionality, security, and performance analysis. This includes:
+            </p>
+            <ul className="grid sm:grid-cols-2 gap-4 pt-4">
+               {[
+                 "Authentication & Security", "User Preferences (Dark Mode)", "Session Persistence", "Performance Monitoring", "Anti-fraud measures", "Core Platform Features"
+               ].map(item => (
+                 <li key={item} className="flex items-center gap-3 text-xs font-black uppercase tracking-widest text-slate-400">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500" /> {item}
+                 </li>
+               ))}
             </ul>
-          </section>
+         </section>
 
-          <section>
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-4">4. Managing Cookies</h2>
-            <p>
-              You can manage your cookie preferences through your browser settings. Note that disabling essential cookies may impact your ability to use the Taplyzer platform effectively.
+         <section className="space-y-4">
+            <h2 className="text-2xl font-black italic tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+               <Eye className="h-6 w-6 text-primary" /> 3. Third-Party Cookies
+            </h2>
+            <p className="text-slate-500 font-medium leading-relaxed italic">
+               We may use third-party analytics services (like Google Analytics) to help us understand how the platform is used. These services may set their own cookies according to their privacy policies.
             </p>
-          </section>
-        </div>
-      </section>
+         </section>
+
+         <section className="space-y-4">
+            <h2 className="text-2xl font-black italic tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+               <ShieldCheck className="h-6 w-6 text-primary" /> 4. Managing Preferences
+            </h2>
+            <p className="text-slate-500 font-medium leading-relaxed italic">
+               You can manage or disable cookies through your browser settings. However, please note that some parts of the Taplyzer platform may not function correctly without essential cookies.
+            </p>
+         </section>
+      </div>
+
+      <div className="text-center">
+         <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Cookie questions? Reach out at <span className="text-primary">support@taplyzer.io</span></p>
+      </div>
     </div>
   )
 }

@@ -8,11 +8,14 @@ import {
   Search, Filter, MapPin, Building2, CheckCircle2, Bookmark, LayoutList, 
   LayoutPanelLeft, TableProperties, TrendingUp, Users, Check, Clock, Target, Sparkles
 } from "lucide-react"
+import Link from "next/link"
 import {
   Dialog,
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { RequestIntroModal } from "@/components/modals/request-intro-modal"
+import { EmptyState } from "@/components/ui/empty-state"
 
 const INTENT_MAP: Record<string, string[]> = {
   "doctor": ["healthcare", "hospital", "clinic", "medical"],
@@ -188,6 +191,8 @@ export default function ExplorePage() {
   const [savedIds, setSavedIds] = useState<number[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<typeof MOCK_OPPORTUNITIES[0] | null>(null);
   const [splitSelectedId, setSplitSelectedId] = useState<number>(1);
+  const [isIntroModalOpen, setIsIntroModalOpen] = useState(false);
+  const [introCompany, setIntroCompany] = useState<any>(null);
 
   const executeSearch = (query: string) => {
     setSearchTerm(query);
@@ -287,7 +292,9 @@ export default function ExplorePage() {
              </div>
              <div className="min-w-0">
                <div className="flex items-center gap-1.5 mb-1">
-                 <h4 className="font-black text-sm text-slate-900 dark:text-white truncate">{op.companyName}</h4>
+                <Link href={`/business/${op.id}`} onClick={(e) => e.stopPropagation()}>
+                  <h4 className="font-black text-sm text-slate-900 dark:text-white truncate hover:text-blue-600 transition-colors">{op.companyName}</h4>
+                </Link>
                  {op.verified && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0"/>}
                </div>
                <p className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1.5 truncate">
@@ -314,18 +321,23 @@ export default function ExplorePage() {
           {/* Actions */}
           <div className="flex items-center gap-3 shrink-0 w-full md:w-auto justify-end">
              <Button 
-               onClick={(e) => { e.stopPropagation(); alert('Intro Requested! The business will be notified.'); }}
+               onClick={(e) => { 
+                 e.stopPropagation(); 
+                 setIntroCompany({ id: op.id, name: op.companyName, industry: op.industry, verified: op.verified });
+                 setIsIntroModalOpen(true);
+               }}
                className="h-10 px-6 rounded-xl font-black uppercase tracking-widest text-[10px] bg-slate-900 text-white hover:bg-blue-600 dark:bg-white dark:text-slate-900 dark:hover:bg-blue-500 transition-colors shadow-md"
              >
                 Request Intro
              </Button>
-             <Button 
-               onClick={(e) => { e.stopPropagation(); setSelectedMatch(op); }}
-               variant="outline"
-               className="h-10 px-6 rounded-xl font-black uppercase tracking-widest text-[10px] border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors hidden sm:flex"
-             >
-                View
-             </Button>
+              <Link href={`/business/${op.id}`}>
+                <Button 
+                  variant="outline"
+                  className="h-10 px-6 rounded-xl font-black uppercase tracking-widest text-[10px] border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors hidden sm:flex"
+                >
+                   View
+                </Button>
+              </Link>
              <button onClick={(e) => toggleSave(op.id, e)} className="p-2.5 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
                <Bookmark className={`h-4 w-4 ${savedIds.includes(op.id) ? 'text-blue-600 fill-blue-600' : 'text-slate-400'}`} />
              </button>
@@ -333,9 +345,11 @@ export default function ExplorePage() {
         </div>
       ))}
       {results.length === 0 && (
-        <div className="p-12 text-center text-slate-500 font-bold border-2 border-dashed border-slate-200 dark:border-white/10 rounded-3xl">
-          No opportunities found. Try adjusting your search.
-        </div>
+        <EmptyState 
+          icon={Search} 
+          title="No Opportunities Found" 
+          description="Try adjusting your search terms or filters to discover new strategic matches."
+        />
       )}
     </div>
   );
@@ -366,7 +380,9 @@ export default function ExplorePage() {
                    <div className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-white/5 flex items-center justify-center font-black text-xs text-slate-400 shrink-0">
                      {op.companyName[0]}
                    </div>
-                   <h4 className="font-black text-sm text-slate-900 dark:text-white truncate">{op.companyName}</h4>
+                   <Link href={`/business/${op.id}`} onClick={(e) => e.stopPropagation()}>
+                     <h4 className="font-black text-slate-900 dark:text-white text-sm italic hover:text-blue-600 transition-colors">{op.companyName}</h4>
+                   </Link>
                    {op.verified && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0"/>}
                  </div>
               </div>
@@ -454,7 +470,13 @@ export default function ExplorePage() {
                  </div>
 
                  <div className="mt-12 flex justify-end">
-                   <Button onClick={() => alert('Intro Requested! The business will be notified.')} className="h-12 px-8 rounded-xl font-black uppercase tracking-widest text-[11px] bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/20">
+                   <Button 
+                    onClick={() => {
+                      setIntroCompany({ id: selectedItem.id, name: selectedItem.companyName, industry: selectedItem.industry, verified: selectedItem.verified });
+                      setIsIntroModalOpen(true);
+                    }} 
+                    className="h-12 px-8 rounded-xl font-black uppercase tracking-widest text-[11px] bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/20"
+                  >
                       Request Introduction
                    </Button>
                  </div>
@@ -486,10 +508,12 @@ export default function ExplorePage() {
                 <div className="flex items-center gap-3">
                    <div className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-white/10 flex items-center justify-center font-black text-slate-500">{op.companyName[0]}</div>
                    <div>
-                     <span className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
-                       {op.companyName} 
-                       {op.verified && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500"/>}
-                     </span>
+                     <Link href={`/business/${op.id}`}>
+                       <h3 className="text-xl font-black text-slate-900 dark:text-white italic tracking-tight flex items-center gap-2 hover:text-blue-600 transition-colors">
+                         {op.companyName}
+                         {op.verified && <CheckCircle2 className="h-4 w-4 text-blue-500 fill-blue-500/10" />}
+                       </h3>
+                     </Link>
                    </div>
                 </div>
               </td>
@@ -499,7 +523,17 @@ export default function ExplorePage() {
               <td className="p-4 text-xs font-bold text-slate-500 flex items-center gap-1.5"><MapPin className="h-3 w-3"/>{op.city}</td>
               <td className="p-4 text-xs font-bold text-slate-400">{op.postedTime}</td>
               <td className="p-4 text-right pr-6">
-                <Button onClick={(e) => { e.stopPropagation(); alert('Intro Requested! The business will be notified.'); }} variant="ghost" className="h-8 px-4 text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">Request Intro</Button>
+                <Button 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    setIntroCompany({ id: op.id, name: op.companyName, industry: op.industry, verified: op.verified });
+                    setIsIntroModalOpen(true);
+                  }} 
+                  variant="ghost" 
+                  className="h-8 px-4 text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                >
+                  Request Intro
+                </Button>
               </td>
             </tr>
           ))}
@@ -760,15 +794,29 @@ export default function ExplorePage() {
                   <Button variant="outline" onClick={() => setSelectedMatch(null)} className="h-12 rounded-xl font-black uppercase tracking-widest text-[11px] border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5">
                      Close
                   </Button>
-                  <Button onClick={() => { alert('Intro Requested! The business will be notified.'); setSelectedMatch(null); }} className="h-12 rounded-xl font-black uppercase tracking-widest text-[11px] bg-blue-600 text-white hover:bg-blue-700 shadow-md">
-                     Request Intro
-                  </Button>
+                   <Button 
+                    onClick={() => { 
+                      setIntroCompany({ id: selectedMatch.id, name: selectedMatch.companyName, industry: selectedMatch.industry, verified: selectedMatch.verified });
+                      setIsIntroModalOpen(true);
+                      setSelectedMatch(null); 
+                    }} 
+                    className="h-12 rounded-xl font-black uppercase tracking-widest text-[11px] bg-blue-600 text-white hover:bg-blue-700 shadow-md"
+                  >
+                      Request Intro
+                   </Button>
                </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
 
+      {introCompany && (
+        <RequestIntroModal 
+          open={isIntroModalOpen} 
+          onClose={() => setIsIntroModalOpen(false)} 
+          company={introCompany} 
+        />
+      )}
     </div>
   )
 }

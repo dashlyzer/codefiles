@@ -12,6 +12,9 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
+  ShieldCheck,
+  BarChart3,
+  MessageSquare
 } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -19,6 +22,9 @@ import { useAuth } from "@/components/auth-provider"
 
 const navigation = [
   { name: "Admin Dashboard", href: "/admin", icon: LayoutDashboard },
+  { name: "Verification Queue", href: "/admin/verification", icon: ShieldCheck },
+  { name: "Platform Requests", href: "/admin/requests", icon: MessageSquare },
+  { name: "Analytics & Growth", href: "/admin/analytics", icon: BarChart3 },
   { name: "Manage Users", href: "/admin/users", icon: Users },
   { name: "Manage Businesses", href: "/admin/businesses", icon: Building2 },
 ]

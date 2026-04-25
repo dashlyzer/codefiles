@@ -8,6 +8,8 @@ import { MatchCard, type Match } from "@/components/dashboard/match-card"
 import { IntroRequests } from "@/components/dashboard/intro-requests"
 import { TrendingUp, Zap, CheckCircle2, Clock, ArrowRight, MessageSquare, Briefcase } from "lucide-react"
 import Link from "next/link"
+import { useState } from "react"
+import { RequestIntroModal } from "@/components/modals/request-intro-modal"
 
 const suggestedMatches: Match[] = [
   {
@@ -52,6 +54,9 @@ const recentActivity = [
 ]
 
 export default function DashboardPage() {
+  const [selectedCompany, setSelectedCompany] = useState<any>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
   return (
     <div className="space-y-10">
       {/* Welcome Section */}
@@ -85,7 +90,14 @@ export default function DashboardPage() {
             </div>
             <div className="grid gap-4">
               {suggestedMatches.map((match) => (
-                <MatchCard key={match.id} match={match} onRequestIntro={() => {}} />
+                <MatchCard 
+                  key={match.id} 
+                  match={match} 
+                  onRequestIntro={() => {
+                    setSelectedCompany({ id: match.id, name: match.name, industry: match.industry, verified: match.verified });
+                    setIsModalOpen(true);
+                  }} 
+                />
               ))}
             </div>
           </section>
@@ -96,8 +108,8 @@ export default function DashboardPage() {
            {/* Profile Completion */}
            <Card className="p-5 md:p-6 bg-white dark:bg-[#0A0A0A] border-slate-200 dark:border-white/5 rounded-2xl">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight italic">Profile Completion</h3>
-                <span className="text-xl font-black text-primary italic">60%</span>
+                <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight italic">Trust & Verification</h3>
+                <span className="text-xl font-black text-emerald-500 italic">94%</span>
               </div>
               
               <div className="w-full h-2 bg-slate-100 dark:bg-white/5 rounded-full mb-5 overflow-hidden">
@@ -148,6 +160,14 @@ export default function DashboardPage() {
            </Card>
         </div>
       </div>
+
+      {selectedCompany && (
+        <RequestIntroModal 
+          open={isModalOpen} 
+          onClose={() => setIsModalOpen(false)} 
+          company={selectedCompany} 
+        />
+      )}
     </div>
   )
 }

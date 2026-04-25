@@ -4,7 +4,8 @@ import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Calendar, Clock, Video, MapPin, Search, Bell, ChevronDown, Building2 } from "lucide-react"
+import { Calendar, Clock, Video, MapPin, Search, Bell, ChevronDown, Building2, Star } from "lucide-react"
+import { RateMeetingModal } from "@/components/modals/rate-meeting-modal"
 
 const allMeetings = [
   {
@@ -39,11 +40,24 @@ const allMeetings = [
     duration: "1 HOUR",
     mode: "IN-PERSON",
     status: "PENDING"
+  },
+  {
+    id: "4",
+    partner: "Global Systems Inc",
+    person: "David Wu",
+    intent: "VENDOR EVALUATION",
+    date: "APR 10, 2026",
+    time: "3:00 PM",
+    duration: "45 MIN",
+    mode: "VIDEO CALL",
+    status: "COMPLETED"
   }
 ]
 
 export default function MeetingsPage() {
   const [search, setSearch] = useState("")
+  const [selectedMeeting, setSelectedMeeting] = useState<any>(null)
+  const [isRateModalOpen, setIsRateModalOpen] = useState(false)
 
   const filteredMeetings = allMeetings.filter(m => 
     m.partner.toLowerCase().includes(search.toLowerCase()) ||
@@ -136,6 +150,17 @@ export default function MeetingsPage() {
                       <Video className="h-3 w-3" /> Join
                    </Button>
                  )}
+                 {m.status === 'COMPLETED' && (
+                   <Button 
+                     onClick={() => {
+                       setSelectedMeeting(m)
+                       setIsRateModalOpen(true)
+                     }}
+                     className="rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black uppercase tracking-widest text-[9px] h-10 px-6 shadow-lg shadow-amber-500/20 flex items-center gap-2 transition-all ml-auto"
+                   >
+                      <Star className="h-3 w-3" /> Leave Rating
+                   </Button>
+                 )}
               </div>
            </div>
          ))}
@@ -145,6 +170,14 @@ export default function MeetingsPage() {
         <div className="py-16 text-center">
           <p className="text-slate-400 font-black uppercase tracking-widest text-sm">No meetings found</p>
         </div>
+      )}
+
+      {selectedMeeting && (
+        <RateMeetingModal
+          open={isRateModalOpen}
+          onClose={() => setIsRateModalOpen(false)}
+          meeting={selectedMeeting}
+        />
       )}
     </div>
   )

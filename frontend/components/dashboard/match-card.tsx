@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { MapPin, Briefcase, Zap, CheckCircle2, User, Target } from "lucide-react"
 
+import Link from "next/link"
+
 export interface Match {
   id: string
   name: string
@@ -88,13 +90,15 @@ export function MatchCard({ match, onRequestIntro }: MatchCardProps) {
           >
             Request Intro
           </Button>
-          <Button 
-            variant="outline" 
-            className="flex-1 h-10 border-slate-200 dark:border-white/10 text-slate-600 dark:text-white/60 font-black rounded-xl uppercase tracking-widest text-[9px] hover:bg-slate-50 dark:hover:bg-white/5 transition-all flex items-center justify-center gap-1"
-          >
-            <User className="h-3 w-3" />
-            Profile
-          </Button>
+          <Link href={`/business/${match.id}?from=matches`} className="flex-1">
+            <Button 
+              variant="outline" 
+              className="w-full h-10 border-slate-200 dark:border-white/10 text-slate-600 dark:text-white/60 font-black rounded-xl uppercase tracking-widest text-[9px] hover:bg-slate-50 dark:hover:bg-white/5 transition-all flex items-center justify-center gap-1"
+            >
+              <User className="h-3 w-3" />
+              Profile
+            </Button>
+          </Link>
         </div>
 
       </CardContent>

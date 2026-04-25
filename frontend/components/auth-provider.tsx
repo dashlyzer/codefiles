@@ -103,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.user.role === "SUPER_ADMIN") {
         router.push("/admin")
       } else {
-        router.push("/profile")
+        router.push("/profile/setup")
       }
     } catch (err: any) {
       setIsLoading(false)

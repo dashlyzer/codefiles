@@ -5,7 +5,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { MatchCard, type Match } from "@/components/dashboard/match-card"
-import { Search, Filter, SlidersHorizontal, ChevronDown, MapPin, Target, Zap, ArrowUpDown, Bell } from "lucide-react"
+import { Search, Filter, SlidersHorizontal, ChevronDown, MapPin, Target, Zap, ArrowUpDown, Bell, Users } from "lucide-react"
+import { RequestIntroModal } from "@/components/modals/request-intro-modal"
+import { EmptyState } from "@/components/ui/empty-state"
 
 const allMatches: Match[] = [
   {
@@ -67,6 +69,8 @@ const allMatches: Match[] = [
 
 export default function MatchesPage() {
   const [search, setSearch] = useState("")
+  const [selectedCompany, setSelectedCompany] = useState<any>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [dealTypeFilter, setDealTypeFilter] = useState("ALL")
   const [industryFilter, setIndustryFilter] = useState("ALL")
 
@@ -123,11 +127,41 @@ export default function MatchesPage() {
       </div>
 
       {/* Grid of Results */}
-      <div className="grid sm:grid-cols-2 gap-5">
-        {filteredMatches.map((match) => (
-          <MatchCard key={match.id} match={match} onRequestIntro={() => {}} />
-        ))}
-      </div>
+      {filteredMatches.length > 0 ? (
+        <div className="grid sm:grid-cols-2 gap-5">
+          {filteredMatches.map((match) => (
+            <MatchCard 
+              key={match.id} 
+              match={match} 
+              onRequestIntro={() => {
+                setSelectedCompany({ id: match.id, name: match.name, industry: match.industry, verified: true });
+                setIsModalOpen(true);
+              }} 
+            />
+          ))}
+        </div>
+      ) : (
+        <EmptyState 
+          icon={Users} 
+          title="No Matches Found" 
+          description="Try adjusting your filters or search terms to find more strategic partners."
+          actionLabel="Clear All Filters"
+          onAction={() => {
+            setSearch("");
+            setDealTypeFilter("ALL");
+            setIndustryFilter("ALL");
+          }}
+        />
+      )}
+
+      {selectedCompany && (
+        <RequestIntroModal 
+          open={isModalOpen} 
+          onClose={() => setIsModalOpen(false)} 
+          company={selectedCompany} 
+        />
+      )}
+
       
       {filteredMatches.length === 0 && (
         <div className="py-20 text-center">
