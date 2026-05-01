@@ -3,7 +3,8 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { MapPin, Briefcase, Zap, CheckCircle2, User, Target } from "lucide-react"
+import { MapPin, Briefcase, Zap, CheckCircle2, User, Target, Bookmark } from "lucide-react"
+import { toast } from "sonner"
 
 import Link from "next/link"
 
@@ -83,7 +84,7 @@ export function MatchCard({ match, onRequestIntro }: MatchCardProps) {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button 
             className="flex-1 h-10 bg-primary hover:bg-primary/90 text-white font-black rounded-xl uppercase tracking-widest text-[9px] shadow-lg shadow-primary/20 transition-all" 
             onClick={() => onRequestIntro(match.id)}
@@ -99,6 +100,14 @@ export function MatchCard({ match, onRequestIntro }: MatchCardProps) {
               Profile
             </Button>
           </Link>
+          <Button 
+            variant="outline" 
+            className="w-10 h-10 p-0 shrink-0 border-slate-200 dark:border-white/10 text-slate-600 dark:text-white/60 hover:bg-slate-50 dark:hover:bg-white/5 transition-all rounded-xl"
+            onClick={() => toast.success(`Saved ${match.name} to your lists.`)}
+            aria-label="Save Match"
+          >
+            <Bookmark className="h-4 w-4" />
+          </Button>
         </div>
 
       </CardContent>

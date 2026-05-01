@@ -6,16 +6,17 @@ import {
   type ThemeProviderProps,
 } from 'next-themes'
 
+// Suppress the specific React 19 warning for the script tag injected by next-themes
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  const orig = console.error;
+  console.error = (...args: unknown[]) => {
+    if (typeof args[0] === 'string' && args[0].includes('Encountered a script tag while rendering React component')) {
+      return;
+    }
+    orig.apply(console, args);
+  };
+}
+
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
-  const [mounted, setMounted] = React.useState(false)
-
-  React.useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return <>{children}</>
-  }
-
   return <NextThemesProvider {...props}>{children}</NextThemesProvider>
 }

@@ -63,11 +63,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {/* Nav */}
           <nav className="flex-grow px-3 space-y-1 overflow-y-auto">
             {navigation.map((item) => {
-              const isActive = pathname === item.href
+              const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
               return (
                 <Link
                   key={item.name}
                   href={item.href}
+                  prefetch={true}
                   onClick={() => setSidebarOpen(false)}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${
                     isActive
