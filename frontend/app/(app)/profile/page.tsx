@@ -12,6 +12,8 @@ import {
    X, Check, Loader2, AlertCircle, Users
 } from "lucide-react"
 import { toast } from "sonner"
+import { useAuth } from "@/components/auth-provider"
+import { useRouter } from "next/navigation"
 
 const INDUSTRY_SUGGESTIONS: Record<string, any> = {
    "Marketing": {
@@ -52,7 +54,10 @@ const ProfileSkeleton = () => (
 )
 
 export default function ProfilePage() {
+   const { user } = useAuth()
+   const router = useRouter()
    const [isInitializing, setIsInitializing] = useState(true)
+   const [isSaving, setIsSaving] = useState(false)
    
    // Modals State
    const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
@@ -80,19 +85,100 @@ export default function ProfilePage() {
    })
 
    useEffect(() => {
-      const cached = sessionStorage.getItem("taplyzer_biz_profile")
-      if (cached) {
-         setProfileData(JSON.parse(cached))
-         setIsInitializing(false)
-      } else {
-         setTimeout(() => setIsInitializing(false), 800)
+      async function fetchProfile() {
+         if (!user?._id) return;
+         
+         try {
+            const res = await fetch(`/api/business/${user._id}`);
+            if (res.ok) {
+               const data = await res.json();
+               // Flatten nested structure back to flat state for UI
+               setProfileData({
+                  ...profileData,
+                  companyName: data.companyName || "",
+                  industry: data.industry || "",
+                  subIndustry: data.subIndustry || "",
+                  businessType: data.businessType || "",
+                  city: data.location?.city || "",
+                  state: data.location?.state || "",
+                  country: data.location?.country || "India",
+                  location: data.location?.city ? `${data.location.city}, ${data.location.state}` : "",
+                  yearsInBusiness: data.strength?.yearsInBusiness?.toString() || "0",
+                  teamSize: data.strength?.teamSize || "1-5",
+                  offerings: data.offerings || [],
+                  needs: data.needs || [],
+                  currentGoal: data.intent?.currentGoal || "",
+                  goalPriority: data.intent?.priority || "Medium",
+                  budget: data.intent?.budget || "",
+                  goalTimeline: data.intent?.timeline || "",
+                  website: data.trust?.website || "",
+                  linkedin: data.trust?.linkedin || "",
+                  verificationStatus: data.trust?.verificationStatus === "Business Verified" ? "Approved" : "Not Started",
+                  memberSince: new Date(data.createdAt || Date.now()).getFullYear().toString()
+               });
+            }
+         } catch (err) {
+            console.error("Failed to fetch profile:", err);
+         } finally {
+            setIsInitializing(false);
+         }
       }
-   }, [])
+      
+      fetchProfile();
+   }, [user?._id])
 
-   const updateData = (newData: any) => {
+   const updateData = async (newData: any) => {
+      if (!user?._id) return;
+
       const merged = { ...profileData, ...newData }
       setProfileData(merged)
-      sessionStorage.setItem("taplyzer_biz_profile", JSON.stringify(merged))
+      setIsSaving(true)
+
+      try {
+         const payload = {
+            ownerId: user._id,
+            companyName: merged.companyName,
+            industry: merged.industry,
+            subIndustry: merged.subIndustry,
+            businessType: merged.businessType,
+            location: {
+               city: merged.city,
+               state: merged.state,
+               country: merged.country,
+               operatesIn: merged.operatesIn || "National"
+            },
+            strength: {
+               yearsInBusiness: parseInt(merged.yearsInBusiness) || 0,
+               teamSize: merged.teamSize
+            },
+            offerings: merged.offerings,
+            needs: merged.needs,
+            intent: {
+               currentGoal: merged.currentGoal,
+               priority: merged.goalPriority,
+               budget: merged.budget,
+               timeline: merged.goalTimeline
+            },
+            trust: {
+               website: merged.website,
+               linkedin: merged.linkedin,
+               verificationStatus: merged.verificationStatus === "Approved" ? "Business Verified" : "Not Verified"
+            },
+            isProfileCompleted: true
+         }
+
+         await fetch("/api/business", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+         })
+         toast.success("Profile synced with server")
+      } catch (error) {
+         console.error("Failed to save profile to DB:", error)
+         toast.error("Failed to sync profile")
+      } finally {
+         setIsSaving(false)
+      }
    }
 
    // Completion Logic
@@ -139,7 +225,7 @@ export default function ProfilePage() {
                         </div>
                      </div>
                      <div className="flex gap-3">
-                        <Button onClick={() => setIsEditProfileOpen(true)} variant="outline" className="font-black uppercase tracking-widest text-[10px] h-10 px-6 rounded-xl border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 shadow-sm"><Edit3 className="h-3 w-3 mr-2" /> Edit Profile</Button>
+                        <Button onClick={() => router.push("/profile/setup")} variant="outline" className="font-black uppercase tracking-widest text-[10px] h-10 px-6 rounded-xl border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 shadow-sm"><Edit3 className="h-3 w-3 mr-2" /> Edit Profile</Button>
                         {profileData.verificationStatus !== "Approved" && profileData.verificationStatus !== "Under Review" && (
                            <Button onClick={() => setIsVerificationOpen(true)} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-black font-black uppercase tracking-widest text-[10px] h-10 px-6 rounded-xl shadow-lg shadow-black/10 dark:shadow-white/10"><ShieldCheck className="h-3 w-3 mr-2" /> Get Verified</Button>
                         )}
@@ -152,7 +238,7 @@ export default function ProfilePage() {
                      <div className="flex-1 bg-slate-200 dark:bg-white/10 rounded-full h-2.5 overflow-hidden">
                         <div className="bg-blue-600 h-full rounded-full transition-all duration-1000" style={{ width: `${completionPct}%` }}></div>
                      </div>
-                     {completionPct < 100 && <Button variant="link" className="text-[10px] font-black uppercase tracking-widest text-blue-600 shrink-0 p-0 h-auto" onClick={() => setIsEditProfileOpen(true)}>Complete Profile</Button>}
+                     {completionPct < 100 && <Button variant="link" className="text-[10px] font-black uppercase tracking-widest text-blue-600 shrink-0 p-0 h-auto" onClick={() => router.push("/profile/setup")}>Complete Profile</Button>}
                   </div>
                </div>
             </div>
@@ -263,7 +349,7 @@ export default function ProfilePage() {
                industry={profileData.industry}
                currentTags={isEditOfferingsOpen ? profileData.offerings : profileData.needs}
                onClose={() => {setIsEditOfferingsOpen(false); setIsEditNeedsOpen(false)}}
-               onSave={(tags) => {
+               onSave={(tags: string[]) => {
                   updateData(isEditOfferingsOpen ? { offerings: tags } : { needs: tags })
                   setIsEditOfferingsOpen(false); setIsEditNeedsOpen(false);
                   toast.success("Tags updated successfully")
@@ -276,7 +362,7 @@ export default function ProfilePage() {
             <EditGoalModal 
                data={profileData}
                onClose={() => setIsEditGoalOpen(false)}
-               onSave={(d) => { updateData(d); setIsEditGoalOpen(false); toast.success("Goal updated successfully") }}
+               onSave={(d: Record<string, unknown>) => { updateData(d); setIsEditGoalOpen(false); toast.success("Goal updated successfully") }}
             />
          )}
 
@@ -285,7 +371,7 @@ export default function ProfilePage() {
             <VerificationWizardModal 
                profileData={profileData}
                onClose={() => setIsVerificationOpen(false)}
-               onComplete={(d) => { updateData(d); setIsVerificationOpen(false); toast.success("Verification submitted!") }}
+               onComplete={(d: Record<string, unknown>) => { updateData(d); setIsVerificationOpen(false); toast.success("Verification submitted!") }}
             />
          )}
 
@@ -294,7 +380,7 @@ export default function ProfilePage() {
             <EditProfileModal 
                data={profileData}
                onClose={() => setIsEditProfileOpen(false)}
-               onSave={(d) => { updateData(d); setIsEditProfileOpen(false); toast.success("Profile saved") }}
+               onSave={(d: Record<string, unknown>) => { updateData(d); setIsEditProfileOpen(false); toast.success("Profile saved") }}
             />
          )}
       </div>

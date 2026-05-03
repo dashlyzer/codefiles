@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/components/auth-provider"
 import { 
   User, Building2, MapPin, Target, Zap, CheckCircle2, 
   ArrowRight, ArrowLeft, ShieldCheck, Globe, Users, 
@@ -20,6 +21,8 @@ const STEPS = [
 
 export default function ProfileSetupPage() {
   const router = useRouter()
+  const { user } = useAuth()
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState({
     name: "", role: "", phone: "",
@@ -32,14 +35,105 @@ export default function ProfileSetupPage() {
   })
 
   const [tagInput, setTagInput] = useState("")
+  const [isInitializing, setIsInitializing] = useState(true)
+
+  useEffect(() => {
+    async function fetchProfile() {
+      if (!user?._id) return;
+      try {
+        const res = await fetch(`/api/business/${user._id}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.companyName) {
+            setFormData({
+              name: data.ownerName || "",
+              role: "", 
+              phone: "", 
+              companyName: data.companyName || "",
+              industry: data.industry || "",
+              businessType: data.businessType || "",
+              teamSize: data.strength?.teamSize || "1-5",
+              country: data.location?.country || "India",
+              state: data.location?.state || "",
+              city: data.location?.city || "",
+              offerings: data.offerings || [],
+              needs: data.needs || [],
+              goal: data.intent?.currentGoal || "",
+              urgency: data.intent?.priority || "",
+              budget: data.intent?.budget || "",
+              timeline: data.intent?.timeline || "",
+              gstin: data.trust?.gst || "",
+              website: data.trust?.website || "",
+              linkedin: data.trust?.linkedin || ""
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch existing profile:", err);
+      } finally {
+        setIsInitializing(false);
+      }
+    }
+    fetchProfile();
+  }, [user?._id]);
+
+  if (isInitializing) {
+    return <div className="min-h-screen bg-slate-50 dark:bg-black flex items-center justify-center"><p className="text-slate-400 font-bold text-sm">Loading profile...</p></div>
+  }
 
   const nextStep = () => setCurrentStep(prev => Math.min(prev + 1, STEPS.length))
   const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1))
 
-  const handleFinish = () => {
-    // Mark setup as complete in localStorage
-    localStorage.setItem("taplyzer_setup_complete", "true")
-    router.push("/dashboard")
+  const handleFinish = async () => {
+    if (!user?._id) return;
+    
+    setIsSubmitting(true)
+    try {
+      const payload = {
+        ownerId: user._id,
+        ownerName: formData.name,
+        companyName: formData.companyName,
+        industry: formData.industry,
+        businessType: formData.businessType,
+        location: {
+          country: formData.country,
+          state: formData.state,
+          city: formData.city,
+          operatesIn: "National"
+        },
+        strength: {
+          teamSize: formData.teamSize
+        },
+        offerings: formData.offerings,
+        needs: formData.needs,
+        intent: {
+          currentGoal: formData.goal,
+          budget: formData.budget,
+          timeline: formData.timeline
+        },
+        trust: {
+          website: formData.website,
+          linkedin: formData.linkedin,
+          gst: formData.gstin
+        },
+        isProfileCompleted: true
+      }
+
+      const res = await fetch("/api/business", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+      
+      if (res.ok) {
+        localStorage.setItem("taplyzer_setup_complete", "true")
+        router.push("/dashboard")
+      }
+    } catch (err) {
+      console.error("Failed to save profile:", err)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const addTag = (type: 'offerings' | 'needs') => {
@@ -322,9 +416,10 @@ export default function ProfileSetupPage() {
            ) : (
              <Button 
               onClick={handleFinish} 
+              disabled={isSubmitting}
               className="h-14 px-12 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-black font-black uppercase tracking-widest text-[11px] shadow-xl shadow-slate-900/20 dark:shadow-white/20 flex items-center gap-3 transition-all hover:scale-105 active:scale-95"
              >
-               Go to Dashboard <Zap className="h-4 w-4 fill-current" />
+               {isSubmitting ? "Saving..." : "Go to Dashboard"} <Zap className="h-4 w-4 fill-current" />
              </Button>
            )}
         </div>

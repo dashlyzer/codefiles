@@ -10,6 +10,10 @@ const UserSchema = new Schema({
   phone: { type: String },
   linkedin: { type: String },
 
+  // Google Calendar Auth
+  googleRefreshToken: { type: String, select: false },
+  googleEmail: { type: String },
+
   role: {
     type: String,
     enum: ["USER", "ADMIN", "SUPER_ADMIN"],

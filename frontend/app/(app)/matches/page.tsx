@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,63 +9,8 @@ import { Search, Filter, SlidersHorizontal, ChevronDown, MapPin, Target, Zap, Ar
 import { RequestIntroModal } from "@/components/modals/request-intro-modal"
 import { EmptyState } from "@/components/ui/empty-state"
 
-const allMatches: Match[] = [
-  {
-    id: "1",
-    name: "Nexus Technologies",
-    industry: "Enterprise Software",
-    location: "San Francisco, CA",
-    score: 96,
-    dealType: "Client",
-    dealValue: "$85,000",
-    description: "Looking for cloud infrastructure solutions to scale their B2B platform. Strong alignment with your service offerings.",
-    verified: true,
-  },
-  {
-    id: "2",
-    name: "DataStream Analytics",
-    industry: "Business Intelligence",
-    location: "New York, NY",
-    score: 91,
-    dealType: "Partnership",
-    dealValue: "$120,000",
-    description: "Seeking strategic partners for market expansion. Complementary product offerings with potential for co-selling.",
-    verified: true,
-  },
-  {
-    id: "3",
-    name: "CloudVault Security",
-    industry: "Cybersecurity",
-    location: "Austin, TX",
-    score: 88,
-    dealType: "Vendor",
-    dealValue: "$45,000",
-    description: "Needs implementation partner for their enterprise security rollout. Budget approved and timeline set.",
-    verified: false,
-  },
-  {
-    id: "4",
-    name: "Zenith Logistics",
-    industry: "Supply Chain",
-    location: "Chicago, IL",
-    score: 85,
-    dealType: "Strategic",
-    dealValue: "$200,000",
-    description: "Modernizing last-mile delivery system. Interested in automation and real-time tracking APIs.",
-    verified: true,
-  },
-  {
-    id: "5",
-    name: "EcoScale Energy",
-    industry: "Renewable Energy",
-    location: "Berlin, DE",
-    score: 82,
-    dealType: "Investment",
-    dealValue: "$500,000",
-    description: "Looking for Series A investment to scale their smart-grid optimization software across Europe.",
-    verified: true,
-  }
-]
+import { useAuth } from "@/components/auth-provider"
+import { Loader2 } from "lucide-react"
 
 export default function MatchesPage() {
   const [search, setSearch] = useState("")
@@ -74,14 +19,44 @@ export default function MatchesPage() {
   const [dealTypeFilter, setDealTypeFilter] = useState("ALL")
   const [industryFilter, setIndustryFilter] = useState("ALL")
 
+  const [allMatches, setAllMatches] = useState<Match[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const { user } = useAuth()
+
+  useEffect(() => {
+    async function fetchMatches() {
+      if (!user?._id) return;
+      try {
+        const res = await fetch(`/api/matches/${user._id}`, { method: "POST" })
+        const data = await res.json()
+        if (data.matches) {
+          setAllMatches(data.matches)
+        }
+      } catch (err) {
+        console.error("Failed to fetch matches", err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchMatches()
+  }, [user])
+
   const filteredMatches = allMatches.filter(match => {
-    const matchesSearch = match.name.toLowerCase().includes(search.toLowerCase()) || 
+    const name = match.companyName || match.candidateName || ""
+    const matchesSearch = name.toLowerCase().includes(search.toLowerCase()) || 
                           match.industry.toLowerCase().includes(search.toLowerCase())
-    const matchesDealType = dealTypeFilter === "ALL" || match.dealType.toUpperCase() === dealTypeFilter
     const matchesIndustry = industryFilter === "ALL" || match.industry.toUpperCase() === industryFilter
     
-    return matchesSearch && matchesDealType && matchesIndustry
+    return matchesSearch && matchesIndustry
   })
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -131,10 +106,10 @@ export default function MatchesPage() {
         <div className="grid sm:grid-cols-2 gap-5">
           {filteredMatches.map((match) => (
             <MatchCard 
-              key={match.id} 
+              key={match.matchedUserId} 
               match={match} 
               onRequestIntro={() => {
-                setSelectedCompany({ id: match.id, name: match.name, industry: match.industry, verified: true });
+                setSelectedCompany({ id: match.matchedUserId, name: match.companyName || match.candidateName, industry: match.industry, verified: match.verified, matchScore: match.score });
                 setIsModalOpen(true);
               }} 
             />

@@ -6,59 +6,14 @@ import { Button } from "@/components/ui/button"
 import { StatsCards } from "@/components/dashboard/stats-cards"
 import { MatchCard, type Match } from "@/components/dashboard/match-card"
 import { IntroRequests } from "@/components/dashboard/intro-requests"
-import { TrendingUp, Zap, CheckCircle2, Clock, ArrowRight, MessageSquare, Briefcase, Video, Info, FileText, Target, Users, MapPin, ArrowUpRight } from "lucide-react"
+import { TrendingUp, Zap, CheckCircle2, Clock, ArrowRight, MessageSquare, Briefcase, Video, Info, FileText, Target, Users, MapPin, ArrowUpRight, Building2 } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { RequestIntroModal } from "@/components/modals/request-intro-modal"
 import { useAuth } from "@/components/auth-provider"
 import { toast } from "sonner"
 
-const suggestedMatches: Match[] = [
-  {
-    id: "1",
-    name: "Nexus Tech Solutions",
-    industry: "Enterprise Software",
-    location: "San Francisco, CA",
-    score: 92,
-    dealType: "Client",
-    dealValue: "$85,000",
-    description: "Looking for cloud infrastructure solutions to scale their B2B platform. Strong alignment with your service offerings.",
-    verified: true,
-  },
-  {
-    id: "2",
-    name: "FinBridge Capital",
-    industry: "Financial Services",
-    location: "New York, NY",
-    score: 88,
-    dealType: "Partnership",
-    dealValue: "$120,000",
-    description: "Seeking strategic partners for market expansion. Complementary product offerings with potential for co-selling.",
-    verified: true,
-  },
-  {
-    id: "3",
-    name: "AgroMax Pvt Ltd",
-    industry: "Supply Chain",
-    location: "Chicago, IL",
-    score: 84,
-    dealType: "Vendor",
-    dealValue: "$200,000",
-    description: "Modernizing last-mile delivery system. Interested in automation and real-time tracking APIs.",
-    verified: true,
-  },
-  {
-    id: "4",
-    name: "UrbanScale Infra",
-    industry: "Real Estate Tech",
-    location: "Austin, TX",
-    score: 81,
-    dealType: "Client",
-    dealValue: "$45,000",
-    description: "Looking for prop-tech software to manage operations.",
-    verified: true,
-  }
-]
+// Removed suggestedMatches static array — real matches loaded from API
 
 const recentActivity = [
   { id: 1, type: "request", content: "You received a request from FinBridge", time: "2 hours ago", icon: MessageSquare, color: "text-blue-500" },
@@ -81,6 +36,43 @@ export default function DashboardPage() {
   const { user } = useAuth()
   const [selectedCompany, setSelectedCompany] = useState<any>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [matches, setMatches] = useState<Match[]>([])
+  const [business, setBusiness] = useState<any>(null)
+  const [meetings, setMeetings] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchData() {
+      if (!user?._id) return;
+      try {
+        const [bizRes, matchesRes, meetingsRes] = await Promise.all([
+          fetch(`/api/business/${user._id}`),
+          fetch(`/api/matches/${user._id}`, { method: "POST" }),
+          fetch(`/api/meetings`)
+        ]);
+        
+        if (bizRes.ok) {
+          const bizData = await bizRes.json();
+          setBusiness(bizData);
+        }
+        
+        if (matchesRes.ok) {
+          const matchesData = await matchesRes.json();
+          setMatches(matchesData.matches?.slice(0, 4) || []);
+        }
+
+        if (meetingsRes.ok) {
+          const meetingsData = await meetingsRes.json();
+          setMeetings(meetingsData.meetings?.slice(0, 3) || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch dashboard data:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchData();
+  }, [user?._id])
 
   return (
     <div className="space-y-10">
@@ -90,24 +82,30 @@ export default function DashboardPage() {
           <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight mb-2 italic">
             Hello, {user?.name || "User"} 👋
           </h1>
-          <p className="text-slate-500 dark:text-white/40 font-bold text-sm tracking-wide">
-            You have new opportunities today.
-          </p>
+          {business ? (
+            <p className="text-slate-500 dark:text-white/40 font-bold text-sm tracking-wide flex items-center gap-2">
+              <Building2 className="h-4 w-4" /> {business.companyName} • <MapPin className="h-4 w-4" /> {business.location?.city || business.location}
+            </p>
+          ) : (
+            <p className="text-slate-500 dark:text-white/40 font-bold text-sm tracking-wide">
+              You have new opportunities today.
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
            <Link href="/profile">
-             <Button variant="outline" className="h-11 px-6 rounded-xl font-black uppercase tracking-widest text-[10px] border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 transition-all">
-               Update Goal
+             <Button asChild variant="outline" className="h-11 px-6 rounded-xl font-black uppercase tracking-widest text-[10px] border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 transition-all">
+               <span>Update Goal</span>
              </Button>
            </Link>
            <Link href="/explore">
-             <Button variant="outline" className="h-11 px-6 rounded-xl font-black uppercase tracking-widest text-[10px] border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 transition-all">
-               Explore Matches
+             <Button asChild variant="outline" className="h-11 px-6 rounded-xl font-black uppercase tracking-widest text-[10px] border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 transition-all">
+               <span>Explore Matches</span>
              </Button>
            </Link>
            <Link href="/requests">
-             <Button className="h-11 px-6 rounded-xl font-black uppercase tracking-widest text-[10px] bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all">
-               View Requests
+             <Button asChild className="h-11 px-6 rounded-xl font-black uppercase tracking-widest text-[10px] bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all">
+               <span>View Requests</span>
              </Button>
            </Link>
         </div>
@@ -127,16 +125,33 @@ export default function DashboardPage() {
             </div>
             
             <div className="grid gap-4 mb-6">
-              {suggestedMatches.map((match) => (
-                <MatchCard 
-                  key={match.id} 
-                  match={match} 
-                  onRequestIntro={() => {
-                    setSelectedCompany({ id: match.id, name: match.name, industry: match.industry, verified: match.verified });
-                    setIsModalOpen(true);
-                  }} 
-                />
-              ))}
+              {isLoading ? (
+                <div className="py-10 text-center"><p className="text-slate-500 font-bold">Finding matches...</p></div>
+              ) : matches.length === 0 ? (
+                <div className="py-10 text-center">
+                  <p className="text-slate-500 font-bold mb-4">No matches found yet.</p>
+                  <Link href="/profile">
+                    <Button variant="outline" size="sm">Complete your profile to get matches</Button>
+                  </Link>
+                </div>
+              ) : (
+                matches.map((match) => (
+                  <MatchCard 
+                    key={match.matchedUserId} 
+                    match={match} 
+                    onRequestIntro={() => {
+                      setSelectedCompany({ 
+                        id: match.matchedUserId, 
+                        name: match.companyName || match.candidateName, 
+                        industry: match.industry, 
+                        verified: match.verified,
+                        matchScore: match.score
+                      });
+                      setIsModalOpen(true);
+                    }} 
+                  />
+                ))
+              )}
             </div>
 
             <Link href="/matches">
@@ -156,10 +171,10 @@ export default function DashboardPage() {
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 block">{t.industry}</span>
                     <div className="flex gap-2">
                        <Link href="/profile" className="flex-1">
-                         <Button size="sm" variant="outline" className="w-full h-8 text-[9px] font-black uppercase tracking-widest border-slate-200 dark:border-white/10">Profile</Button>
+                         <Button asChild size="sm" variant="outline" className="w-full h-8 text-[9px] font-black uppercase tracking-widest border-slate-200 dark:border-white/10"><span>Profile</span></Button>
                        </Link>
                        <Link href="/explore" className="flex-1">
-                         <Button size="sm" className="w-full h-8 text-[9px] font-black uppercase tracking-widest bg-primary text-white">Explore</Button>
+                         <Button asChild size="sm" className="w-full h-8 text-[9px] font-black uppercase tracking-widest bg-primary text-white"><span>Explore</span></Button>
                        </Link>
                     </div>
                  </div>
@@ -175,26 +190,39 @@ export default function DashboardPage() {
 
            {/* Upcoming Meetings Widget */}
            <Card className="p-6 bg-white dark:bg-[#0A0A0A] border-slate-200 dark:border-white/5 rounded-[2rem]">
-              <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight italic mb-5">Upcoming Meetings</h3>
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight italic">Upcoming Meetings</h3>
+                <Link href="/meetings">
+                  <Button variant="ghost" size="sm" className="text-[9px] font-black uppercase tracking-widest text-primary p-0 h-auto hover:bg-transparent">View All</Button>
+                </Link>
+              </div>
               <div className="space-y-4">
-                 {upcomingMeetings.map(m => (
-                    <div key={m.id} className="p-4 bg-slate-50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 rounded-2xl">
-                       <div className="flex items-center gap-3 mb-3">
-                          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                             <Video className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                             <h4 className="font-bold text-sm text-slate-900 dark:text-white">{m.name}</h4>
-                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1 mt-0.5"><Clock className="h-3 w-3"/> {m.time}</span>
-                          </div>
-                       </div>
-                       <div className="flex gap-2 mt-2">
-                          <Button size="sm" className="flex-1 h-8 text-[9px] font-black uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 text-white transition-all" onClick={() => toast.success(`Joining meeting with ${m.name}...`)}>Join</Button>
-                          <Button size="sm" variant="outline" className="flex-1 h-8 text-[9px] font-black uppercase tracking-widest border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 transition-all" onClick={() => toast.info(`Reschedule request sent to ${m.name}`)}>Reschedule</Button>
-                       </div>
-                       <Button size="sm" variant="ghost" className="w-full mt-2 h-8 text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-white/40 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-emerald-500/10 transition-all" onClick={() => toast.success(`Meeting with ${m.name} marked as complete!`)}>Mark Complete</Button>
-                    </div>
-                 ))}
+                 {meetings.length === 0 ? (
+                   <p className="text-xs font-medium text-slate-400 text-center py-4 italic">No upcoming meetings</p>
+                 ) : (
+                   meetings.map(m => (
+                      <div key={m._id} className="p-4 bg-slate-50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 rounded-2xl">
+                         <div className="flex items-center gap-3 mb-3">
+                            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                               <Video className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                               <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate max-w-[150px]">
+                                 {m.organizerId?._id === user?._id ? (m.connectionId?.userBBizName || "Meeting") : (m.connectionId?.userABizName || "Meeting")}
+                               </h4>
+                               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1 mt-0.5">
+                                 <Clock className="h-3 w-3"/> {new Date(m.startTime).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}
+                               </span>
+                            </div>
+                         </div>
+                         <div className="flex gap-2 mt-2">
+                            <a href={m.meetLink} target="_blank" rel="noopener noreferrer" className="flex-1">
+                              <Button size="sm" className="w-full h-8 text-[9px] font-black uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 text-white transition-all">Join</Button>
+                            </a>
+                         </div>
+                      </div>
+                   ))
+                 )}
               </div>
            </Card>
 

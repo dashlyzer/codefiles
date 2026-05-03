@@ -5,7 +5,9 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Send, Building2, MessageSquare, Target, Banknote, CheckCircle2 } from "lucide-react"
+import { Send, Building2, MessageSquare, Target, Banknote, CheckCircle2, AlertCircle } from "lucide-react"
+import { useAuth } from "@/components/auth-provider"
+import { toast } from "sonner"
 
 interface RequestIntroModalProps {
   open: boolean
@@ -15,55 +17,62 @@ interface RequestIntroModalProps {
     name: string
     industry?: string
     verified?: boolean
+    matchScore?: number
   }
 }
 
 const DEAL_TYPES = ["Client", "Partnership", "Vendor", "Investment", "Collaboration", "Supplier"]
 
 export function RequestIntroModal({ open, onClose, company }: RequestIntroModalProps) {
-  const [step, setStep] = useState<"form" | "success">("form")
+  const { user } = useAuth()
+  const [step, setStep] = useState<"form" | "success" | "error">("form")
   const [message, setMessage] = useState("")
   const [dealType, setDealType] = useState("")
   const [summary, setSummary] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMsg, setErrorMsg] = useState("")
 
   const handleSubmit = async () => {
     if (!message.trim() || !dealType) return
+    if (!user?._id) {
+      toast.error("You must be logged in to send a request.")
+      return
+    }
+
     setIsSubmitting(true)
+    setErrorMsg("")
 
-    // Simulate API call
-    await new Promise(r => setTimeout(r, 900))
+    try {
+      const res = await fetch("/api/requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          senderId: user._id,
+          receiverId: company.id,
+          dealType,
+          message,
+          summary,
+          matchScore: company.matchScore || 0,
+        }),
+      })
 
-    // Persist to localStorage for Requests page
-    const existing = JSON.parse(localStorage.getItem("taplyzer_sent_requests") || "[]")
-    existing.unshift({
-      id: Date.now(),
-      company: company.name,
-      industry: company.industry || "Business",
-      message,
-      dealType,
-      summary,
-      status: "Pending",
-      time: "Just now",
-      match: Math.floor(Math.random() * 15 + 80) + "%"
-    })
-    localStorage.setItem("taplyzer_sent_requests", JSON.stringify(existing))
+      const data = await res.json()
 
-    // Add notification
-    const notifs = JSON.parse(localStorage.getItem("taplyzer_notifications") || "[]")
-    notifs.unshift({
-      id: Date.now(),
-      type: "request_sent",
-      title: "Intro Request Sent",
-      message: `Your request to ${company.name} is pending their response.`,
-      href: "/requests",
-      read: false,
-      time: new Date().toISOString()
-    })
-    localStorage.setItem("taplyzer_notifications", JSON.stringify(notifs))
-
-    setIsSubmitting(false)
-    setStep("success")
+      if (res.ok) {
+        setStep("success")
+      } else if (res.status === 409) {
+        setErrorMsg("You already have a pending request with this company.")
+        setStep("error")
+      } else {
+        setErrorMsg(data.msg || "Something went wrong. Please try again.")
+        setStep("error")
+      }
+    } catch (err) {
+      setErrorMsg("Network error. Please check your connection.")
+      setStep("error")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleClose = () => {
@@ -71,6 +80,7 @@ export function RequestIntroModal({ open, onClose, company }: RequestIntroModalP
     setMessage("")
     setDealType("")
     setSummary("")
+    setErrorMsg("")
     onClose()
   }
 
@@ -170,7 +180,7 @@ export function RequestIntroModal({ open, onClose, company }: RequestIntroModalP
               </Button>
             </div>
           </div>
-        ) : (
+        ) : step === "success" ? (
           // Success State
           <div className="p-10 flex flex-col items-center text-center space-y-6">
             <div className="h-20 w-20 rounded-full bg-emerald-500/10 flex items-center justify-center">
@@ -194,6 +204,25 @@ export function RequestIntroModal({ open, onClose, company }: RequestIntroModalP
             <Button onClick={handleClose} className="h-12 px-8 rounded-xl bg-primary text-white font-black uppercase tracking-widest text-[10px]">
               Done
             </Button>
+          </div>
+        ) : (
+          // Error State
+          <div className="p-10 flex flex-col items-center text-center space-y-6">
+            <div className="h-20 w-20 rounded-full bg-red-500/10 flex items-center justify-center">
+              <AlertCircle className="h-10 w-10 text-red-500" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black italic tracking-tight text-slate-900 dark:text-white mb-2">Request Failed</h2>
+              <p className="text-slate-500 dark:text-white/40 font-medium text-sm">{errorMsg}</p>
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={handleClose} className="h-12 px-8 rounded-xl font-black uppercase tracking-widest text-[10px] border-slate-200 dark:border-white/10">
+                Close
+              </Button>
+              <Button onClick={() => setStep("form")} className="h-12 px-8 rounded-xl bg-primary text-white font-black uppercase tracking-widest text-[10px]">
+                Try Again
+              </Button>
+            </div>
           </div>
         )}
       </DialogContent>

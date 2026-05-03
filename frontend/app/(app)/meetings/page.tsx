@@ -1,68 +1,105 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Calendar, Clock, Video, MapPin, Search, Bell, ChevronDown, Building2, Star } from "lucide-react"
-import { RateMeetingModal } from "@/components/modals/rate-meeting-modal"
+import { Calendar as CalendarIcon, Clock, Video, Bell, Calendar, ChevronDown, Building2, MapPin, Search } from "lucide-react"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { format } from "date-fns"
+import { cn } from "@/lib/utils"
 
-const allMeetings = [
-  {
-    id: "1",
-    partner: "DataStream Analytics",
-    person: "Sarah Chen",
-    intent: "PARTNERSHIP DISCUSSION",
-    date: "APR 14, 2026",
-    time: "10:00 AM",
-    duration: "30 MIN",
-    mode: "VIDEO CALL",
-    status: "CONFIRMED"
-  },
-  {
-    id: "2",
-    partner: "Nexus Technologies",
-    person: "Michael Park",
-    intent: "INITIAL DISCOVERY",
-    date: "APR 15, 2026",
-    time: "2:00 PM",
-    duration: "45 MIN",
-    mode: "VIDEO CALL",
-    status: "CONFIRMED"
-  },
-  {
-    id: "3",
-    partner: "ScaleOps Solutions",
-    person: "Emily Rodriguez",
-    intent: "CONTRACT NEGOTIATION",
-    date: "APR 17, 2026",
-    time: "11:00 AM",
-    duration: "1 HOUR",
-    mode: "IN-PERSON",
-    status: "PENDING"
-  },
-  {
-    id: "4",
-    partner: "Global Systems Inc",
-    person: "David Wu",
-    intent: "VENDOR EVALUATION",
-    date: "APR 10, 2026",
-    time: "3:00 PM",
-    duration: "45 MIN",
-    mode: "VIDEO CALL",
-    status: "COMPLETED"
-  }
-]
+function MeetingsContent() {
+  const searchParams = useSearchParams()
+  const connectionToken = searchParams.get("token")
 
-export default function MeetingsPage() {
+  const [meetings, setMeetings] = useState<any[]>([])
+  const [googleConnected, setGoogleConnected] = useState(false)
+  const [googleEmail, setGoogleEmail] = useState("")
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
-  const [selectedMeeting, setSelectedMeeting] = useState<any>(null)
-  const [isRateModalOpen, setIsRateModalOpen] = useState(false)
 
-  const filteredMeetings = allMeetings.filter(m => 
-    m.partner.toLowerCase().includes(search.toLowerCase()) ||
-    m.person.toLowerCase().includes(search.toLowerCase())
-  )
+  // Scheduling state
+  const [isScheduling, setIsScheduling] = useState(!!connectionToken)
+  const [date, setDate] = useState<Date>()
+  const [hour, setHour] = useState("10")
+  const [minute, setMinute] = useState("00")
+  const [period, setPeriod] = useState("AM")
+  const [duration, setDuration] = useState(30)
+  const [scheduleLoading, setScheduleLoading] = useState(false)
+
+  useEffect(() => {
+    fetchMeetings()
+  }, [])
+
+  const fetchMeetings = async () => {
+    try {
+      const res = await fetch(`/api/meetings${connectionToken ? `?connectionToken=${connectionToken}` : ''}`)
+      const data = await res.json()
+      if (res.ok) {
+        setMeetings(data.meetings || [])
+        setGoogleConnected(data.googleCalendarConnected)
+        setGoogleEmail(data.googleEmail)
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleConnectGoogle = () => {
+    window.location.href = "/api/auth/google"
+  }
+
+  const handleSchedule = async () => {
+    if (!date || scheduleLoading || !connectionToken) return
+
+    setScheduleLoading(true)
+    try {
+      let h = parseInt(hour)
+      if (period === "PM" && h < 12) h += 12
+      if (period === "AM" && h === 12) h = 0
+
+      const startTime = new Date(date)
+      startTime.setHours(h, parseInt(minute), 0, 0)
+
+      const res = await fetch("/api/meetings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          connectionToken,
+          startTime: startTime.toISOString(),
+          durationMinutes: duration
+        })
+      })
+
+      if (res.ok) {
+        setIsScheduling(false)
+        fetchMeetings()
+      } else {
+        const error = await res.json()
+        alert(`Error: ${error.error}`)
+      }
+    } catch (err) {
+      console.error(err)
+      alert("Failed to schedule meeting")
+    } finally {
+      setScheduleLoading(false)
+    }
+  }
+
+  const filteredMeetings = meetings.filter(m => {
+    const searchString = search.toLowerCase()
+    return (
+      m.connectionId?.userABizName?.toLowerCase().includes(searchString) ||
+      m.connectionId?.userBBizName?.toLowerCase().includes(searchString) ||
+      m.organizerId?.name?.toLowerCase().includes(searchString) ||
+      m.attendeeId?.name?.toLowerCase().includes(searchString)
+    )
+  })
 
   return (
     <div className="space-y-6">
@@ -74,6 +111,11 @@ export default function MeetingsPage() {
         </div>
         
         <div className="flex items-center gap-3 w-full sm:w-auto">
+           {connectionToken && !isScheduling && (
+             <Button onClick={() => setIsScheduling(true)} className="bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest text-[10px] h-11 px-6 rounded-2xl shadow-lg shadow-primary/20">
+               Schedule New
+             </Button>
+           )}
            <div className="relative flex-grow sm:flex-grow-0 sm:w-[240px]">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input 
@@ -83,102 +125,180 @@ export default function MeetingsPage() {
                 onChange={(e) => setSearch(e.target.value)}
               />
            </div>
-           <button className="h-11 w-11 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center text-slate-400 hover:text-primary transition-all flex-shrink-0">
-              <Bell className="h-4 w-4" />
-           </button>
         </div>
       </div>
 
-      {/* Filters Bar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="outline" className="h-9 px-4 rounded-xl border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[9px] flex items-center gap-1.5 hover:border-primary/50 transition-all">
-           Meeting Type <ChevronDown className="h-3 w-3" />
-        </Button>
-        <Button variant="outline" className="h-9 px-4 rounded-xl border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[9px] flex items-center gap-1.5 hover:border-primary/50 transition-all">
-           Status <ChevronDown className="h-3 w-3" />
-        </Button>
-      </div>
+      {isScheduling && connectionToken && (
+        <div className="bg-white dark:bg-[#0A0A0A] border border-slate-200 dark:border-white/5 rounded-2xl p-6 md:p-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-black tracking-tight italic">Schedule Meeting</h2>
+            <Button variant="ghost" onClick={() => setIsScheduling(false)} className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Cancel</Button>
+          </div>
+
+          <div className="space-y-6">
+            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-primary bg-primary/10 w-fit px-3 py-1.5 rounded-lg mb-4">
+              <Video className="h-4 w-4" /> Professional Meeting Hosted by Taplyzer
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <label className="text-xs font-black uppercase tracking-widest text-slate-500">Select Date</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal rounded-xl h-11 border-slate-200 dark:border-white/10",
+                        !date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4 text-primary" />
+                      {date ? format(date, "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={date}
+                      onSelect={setDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-4">
+                <label className="text-xs font-black uppercase tracking-widest text-slate-500">Select Time & Duration</label>
+                <div className="flex flex-wrap gap-2">
+                  <select 
+                    className="h-11 w-20 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 px-3 text-sm font-bold text-slate-900 dark:text-white"
+                    value={hour}
+                    onChange={(e) => setHour(e.target.value)}
+                  >
+                    {Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0')).map(h => (
+                      <option key={h} value={h} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">{h}</option>
+                    ))}
+                  </select>
+                  <select 
+                    className="h-11 w-20 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 px-3 text-sm font-bold text-slate-900 dark:text-white"
+                    value={minute}
+                    onChange={(e) => setMinute(e.target.value)}
+                  >
+                    {Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0')).map(m => (
+                      <option key={m} value={m} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">{m}</option>
+                    ))}
+                  </select>
+                  <select 
+                    className="h-11 w-20 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 px-3 text-sm font-bold text-slate-900 dark:text-white"
+                    value={period}
+                    onChange={(e) => setPeriod(e.target.value)}
+                  >
+                    <option value="AM" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">AM</option>
+                    <option value="PM" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">PM</option>
+                  </select>
+                  <select 
+                    className="h-11 flex-1 min-w-[100px] rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 px-3 text-sm font-bold text-slate-900 dark:text-white"
+                    value={duration}
+                    onChange={(e) => setDuration(Number(e.target.value))}
+                  >
+                    <option value={15} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">15 mins</option>
+                    <option value={30} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">30 mins</option>
+                    <option value={45} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">45 mins</option>
+                    <option value={60} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">1 hour</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <Button 
+              onClick={handleSchedule} 
+              disabled={!date || scheduleLoading}
+              className="w-full bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest text-[11px] h-12 rounded-xl shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
+            >
+              {scheduleLoading ? "Scheduling..." : "Schedule Meeting & Generate Meet Link"}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Meeting Cards */}
-      <div className="grid gap-4">
-         {filteredMeetings.map((m) => (
-           <div key={m.id} className="p-5 md:p-8 rounded-2xl bg-white dark:bg-[#0A0A0A] border border-slate-200 dark:border-white/5 group hover:border-primary/20 transition-all duration-300">
-              
-              {/* Card Top: identity + status */}
-              <div className="flex items-start justify-between gap-4 mb-5">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 md:h-14 md:w-14 rounded-xl md:rounded-2xl bg-slate-50 dark:bg-white/5 flex items-center justify-center border border-slate-100 dark:border-white/10 group-hover:bg-primary group-hover:text-white transition-all flex-shrink-0">
-                     <Building2 className="h-6 w-6 text-primary group-hover:text-white" />
+      {!loading && filteredMeetings.length > 0 && (
+        <div className="grid gap-4">
+           {filteredMeetings.map((m) => (
+             <div key={m._id} className="p-5 md:p-8 rounded-2xl bg-white dark:bg-[#0A0A0A] border border-slate-200 dark:border-white/5 group hover:border-primary/20 transition-all duration-300">
+                
+                {/* Card Top: identity + status */}
+                <div className="flex items-start justify-between gap-4 mb-5">
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 md:h-14 md:w-14 rounded-xl md:rounded-2xl bg-slate-50 dark:bg-white/5 flex items-center justify-center border border-slate-100 dark:border-white/10 group-hover:bg-primary group-hover:text-white transition-all flex-shrink-0">
+                       <Video className="h-6 w-6 text-primary group-hover:text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-base md:text-lg font-black text-slate-900 dark:text-white leading-tight">
+                        {m.connectionId?.userABizName} & {m.connectionId?.userBBizName}
+                      </h3>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                        Organizer: {m.organizerId?.name} | Attendee: {m.attendeeId?.name}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-base md:text-lg font-black text-slate-900 dark:text-white leading-tight">{m.partner}</h3>
-                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">With {m.person}</p>
-                    <p className="text-[9px] font-black uppercase tracking-widest text-primary mt-0.5">{m.intent}</p>
-                  </div>
+                  <Badge className={`uppercase text-[9px] font-black tracking-wider px-3 py-1.5 border-none flex-shrink-0 ${m.status === 'SCHEDULED' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-500/10 text-slate-500'}`}>
+                     {m.status}
+                  </Badge>
                 </div>
-                <Badge className={`uppercase text-[9px] font-black tracking-wider px-3 py-1.5 border-none flex-shrink-0 ${m.status === 'CONFIRMED' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
-                   {m.status}
-                </Badge>
-              </div>
-
-              {/* Meta info row — wraps on mobile */}
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-5">
-                 <div className="flex items-center gap-2">
-                    <Calendar className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">{m.date}</span>
-                 </div>
-                 <div className="flex items-center gap-2">
-                    <Clock className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">{m.time} ({m.duration})</span>
-                 </div>
-                 <div className="flex items-center gap-2">
-                    {m.mode === 'VIDEO CALL' ? <Video className="h-3.5 w-3.5 text-primary flex-shrink-0" /> : <MapPin className="h-3.5 w-3.5 text-primary flex-shrink-0" />}
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">{m.mode}</span>
-                 </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex flex-wrap items-center gap-2">
-                 <Button variant="outline" className="rounded-xl border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[9px] h-10 px-5 hover:bg-slate-50 dark:hover:bg-white/5 transition-all">
-                    Reschedule
-                 </Button>
-                 <Button variant="outline" className="rounded-xl border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[9px] h-10 px-5 hover:bg-slate-50 dark:hover:bg-white/5 transition-all">
-                    Cancel
-                 </Button>
-                 {m.mode === 'VIDEO CALL' && m.status === 'CONFIRMED' && (
-                   <Button className="rounded-xl bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest text-[9px] h-10 px-6 shadow-lg shadow-primary/20 flex items-center gap-2 transition-all">
-                      <Video className="h-3 w-3" /> Join
-                   </Button>
-                 )}
-                 {m.status === 'COMPLETED' && (
-                   <Button 
-                     onClick={() => {
-                       setSelectedMeeting(m)
-                       setIsRateModalOpen(true)
-                     }}
-                     className="rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black uppercase tracking-widest text-[9px] h-10 px-6 shadow-lg shadow-amber-500/20 flex items-center gap-2 transition-all ml-auto"
-                   >
-                      <Star className="h-3 w-3" /> Leave Rating
-                   </Button>
-                 )}
-              </div>
-           </div>
-         ))}
-      </div>
-
-      {filteredMeetings.length === 0 && (
-        <div className="py-16 text-center">
-          <p className="text-slate-400 font-black uppercase tracking-widest text-sm">No meetings found</p>
+  
+                {/* Meta info row */}
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-5">
+                   <div className="flex items-center gap-2">
+                      <Calendar className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">
+                        {format(new Date(m.startTime), "MMM dd, yyyy")}
+                      </span>
+                   </div>
+                   <div className="flex items-center gap-2">
+                      <Clock className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">
+                        {format(new Date(m.startTime), "hh:mm a")}
+                      </span>
+                   </div>
+                   <div className="flex items-center gap-2">
+                      <Video className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">Google Meet</span>
+                   </div>
+                </div>
+  
+                {/* Actions */}
+                <div className="flex flex-wrap items-center gap-2">
+                   {m.status === 'SCHEDULED' && (
+                     <a href={m.meetLink} target="_blank" rel="noopener noreferrer">
+                       <Button className="rounded-xl bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest text-[9px] h-10 px-6 shadow-lg shadow-primary/20 flex items-center gap-2 transition-all">
+                          <Video className="h-3 w-3" /> Join Meeting
+                       </Button>
+                     </a>
+                   )}
+                </div>
+             </div>
+           ))}
         </div>
       )}
 
-      {selectedMeeting && (
-        <RateMeetingModal
-          open={isRateModalOpen}
-          onClose={() => setIsRateModalOpen(false)}
-          meeting={selectedMeeting}
-        />
+      {!loading && filteredMeetings.length === 0 && !isScheduling && (
+        <div className="py-16 text-center bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10">
+          <CalendarIcon className="h-12 w-12 mx-auto text-slate-300 mb-4" />
+          <p className="text-slate-400 font-black uppercase tracking-widest text-sm">No meetings scheduled</p>
+        </div>
+      )}
+
+      {loading && (
+        <div className="py-16 text-center">
+          <p className="text-slate-400 font-black uppercase tracking-widest text-sm animate-pulse">Loading meetings...</p>
+        </div>
       )}
     </div>
+  )
+}
+
+export default function MeetingsPage() {
+  return (
+    <Suspense fallback={<div className="py-16 text-center text-slate-400 font-black uppercase tracking-widest text-sm animate-pulse">Loading...</div>}>
+      <MeetingsContent />
+    </Suspense>
   )
 }

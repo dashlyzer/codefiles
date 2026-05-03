@@ -29,6 +29,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logOut } = useAuth()
   const { theme, setTheme } = useTheme()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     const isSetupComplete = localStorage.getItem("taplyzer_setup_complete") === "true"
@@ -137,7 +142,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-white/5 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-white/10 transition-all"
             >
-              {theme === "dark" ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-slate-500" />}
+              {mounted && (theme === "dark" ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-slate-500" />)}
             </button>
 
             {/* Notification Bell */}

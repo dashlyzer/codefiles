@@ -1,28 +1,148 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { MessageSquare, Clock, CheckCircle2, XCircle, ArrowRight, User, Check, X, Calendar } from "lucide-react"
-import { DealFlowStepper } from "@/components/deal/deal-flow-stepper"
+import { 
+  MessageSquare, Clock, CheckCircle2, XCircle, 
+  ArrowRight, Check, X, Calendar, Loader2, Inbox, Send, Zap
+} from "lucide-react"
+import { useAuth } from "@/components/auth-provider"
+import { toast } from "sonner"
+
+interface IntroRequest {
+  _id: string
+  senderId: string
+  receiverId: string
+  senderBizName: string
+  receiverBizName: string
+  dealType: string
+  message: string
+  summary: string
+  matchScore: number
+  status: "pending" | "accepted" | "rejected"
+  connectionToken: string | null
+  createdAt: string
+}
+
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return "Just now"
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
+function StatusBadge({ status }: { status: IntroRequest["status"] }) {
+  if (status === "accepted") {
+    return <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-black uppercase text-[9px] tracking-widest">Accepted</Badge>
+  }
+  if (status === "rejected") {
+    return <Badge className="bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20 font-black uppercase text-[9px] tracking-widest">Rejected</Badge>
+  }
+  return <Badge className="bg-amber-500/10 text-amber-600 dark:text-amber-500 border-amber-500/20 font-black uppercase text-[9px] tracking-widest">Pending</Badge>
+}
+
+function EmptyState({ icon: Icon, title, subtitle }: { icon: any; title: string; subtitle: string }) {
+  return (
+    <div className="py-24 flex flex-col items-center text-center opacity-50">
+      <div className="h-20 w-20 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center mb-5">
+        <Icon className="h-10 w-10 text-slate-400" />
+      </div>
+      <p className="text-base font-black text-slate-500 dark:text-white/40 uppercase tracking-widest">{title}</p>
+      <p className="text-sm font-medium text-slate-400 mt-2">{subtitle}</p>
+    </div>
+  )
+}
+
+function ConnectionTokenCard({ token, partnerName }: { token: string; partnerName: string }) {
+  return (
+    <div className="mt-4 p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/20">
+      <div className="flex items-center gap-2 mb-3">
+        <Zap className="h-4 w-4 text-emerald-500 fill-emerald-500" />
+        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Connection Established</span>
+      </div>
+      <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-3">
+        You are now connected with <span className="font-black text-slate-900 dark:text-white">{partnerName}</span>. Use your connection token to schedule a meeting.
+      </p>
+      <div className="flex items-center gap-2 bg-white dark:bg-black/20 rounded-xl p-3 border border-emerald-500/10 mb-4">
+        <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 truncate flex-1">{token}</span>
+      </div>
+      <Link href={`/meetings?token=${token}`}>
+        <Button className="w-full h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2">
+          <Calendar className="h-4 w-4" /> Schedule Meeting
+        </Button>
+      </Link>
+    </div>
+  )
+}
 
 export default function RequestsPage() {
+  const { user } = useAuth()
   const [activeTab, setActiveTab] = useState("received")
-  const [receivedRequests, setReceivedRequests] = useState([
-    { id: 1, company: "Acme Corp", message: "We're very interested in your recent intent regarding AI infrastructure and would love to discuss a potential partnership.", status: "Pending", match: "96%", time: "2 hours ago" },
-    { id: 2, company: "BuildIt Ltd", message: "Your expertise in cloud scaling matches our current project needs. Let's explore how we can work together.", status: "Pending", match: "91%", time: "5 hours ago" },
-    { id: 3, company: "Nexus Systems", message: "Interested in your supply chain solution for our East Coast operations.", status: "Accepted", match: "88%", time: "1 day ago" },
-  ])
+  const [received, setReceived] = useState<IntroRequest[]>([])
+  const [sent, setSent] = useState<IntroRequest[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
 
-  const [sentRequests, setSentRequests] = useState([
-    { id: 4, company: "Xenia Soft", message: "We saw your offer for strategic investment and would like to share our current performance metrics.", status: "Pending", match: "94%", time: "Sent 2 days ago" },
-    { id: 5, company: "Y-Combinator", message: "Requesting an introduction regarding your portfolio's infrastructure needs.", status: "Rejected", match: "89%", time: "Sent 1 week ago" },
-  ])
+  const fetchRequests = useCallback(async () => {
+    if (!user?._id) return
+    try {
+      const res = await fetch(`/api/requests/${user._id}`)
+      if (res.ok) {
+        const data = await res.json()
+        setReceived(data.received || [])
+        setSent(data.sent || [])
+      }
+    } catch (err) {
+      console.error("Failed to fetch requests:", err)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [user?._id])
 
-  const handleAction = (id: number, action: 'Accepted' | 'Rejected') => {
-    setReceivedRequests(prev => prev.map(r => r.id === id ? { ...r, status: action } : r))
+  useEffect(() => {
+    fetchRequests()
+  }, [fetchRequests])
+
+  const handleAction = async (requestId: string, action: "accept" | "reject", partnerName: string) => {
+    setActionLoading(requestId + action)
+    try {
+      const res = await fetch(`/api/requests/${requestId}/${action}`, {
+        method: "PATCH",
+      })
+      const data = await res.json()
+
+      if (res.ok) {
+        if (action === "accept") {
+          toast.success(`Connected with ${partnerName}! 🎉 A meeting token has been created.`)
+        } else {
+          toast.info(`Request from ${partnerName} declined.`)
+        }
+        // Refresh the list
+        await fetchRequests()
+      } else {
+        toast.error(data.msg || "Action failed. Please try again.")
+      }
+    } catch (err) {
+      toast.error("Network error. Please try again.")
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const pendingCount = received.filter(r => r.status === "pending").length
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
@@ -34,88 +154,128 @@ export default function RequestsPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="bg-white dark:bg-[#0A0A0A] p-1 rounded-2xl h-16 mb-8 border border-slate-200 dark:border-white/5 shadow-xl shadow-slate-100 dark:shadow-none">
-          <TabsTrigger value="received" className="rounded-xl px-12 h-full font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-primary data-[state=active]:text-white shadow-sm transition-all">
-            Received ({receivedRequests.filter(r => r.status === 'Pending').length})
+          <TabsTrigger value="received" className="rounded-xl px-8 md:px-12 h-full font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-primary data-[state=active]:text-white shadow-sm transition-all flex items-center gap-2">
+            <Inbox className="h-3.5 w-3.5" />
+            Received {pendingCount > 0 && <span className="bg-white/20 text-white rounded-full px-1.5 py-0.5 text-[9px]">{pendingCount}</span>}
           </TabsTrigger>
-          <TabsTrigger value="sent" className="rounded-xl px-12 h-full font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-primary data-[state=active]:text-white shadow-sm transition-all">
-            Sent ({sentRequests.length})
+          <TabsTrigger value="sent" className="rounded-xl px-8 md:px-12 h-full font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-primary data-[state=active]:text-white shadow-sm transition-all flex items-center gap-2">
+            <Send className="h-3.5 w-3.5" />
+            Sent ({sent.length})
           </TabsTrigger>
         </TabsList>
 
+        {/* RECEIVED TAB */}
         <TabsContent value="received" className="space-y-4">
-           {receivedRequests.map(r => (
-             <div key={r.id} className="p-10 rounded-[2.5rem] bg-white dark:bg-[#0A0A0A] border border-slate-200 dark:border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-8 group hover:border-primary/20 hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500">
-                <div className="flex gap-8">
-                   <div className="h-20 w-20 rounded-[1.5rem] bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 flex items-center justify-center font-black text-3xl text-primary group-hover:bg-primary group-hover:text-white transition-all">
-                      {r.company[0]}
-                   </div>
-                   <div className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <h3 className="text-2xl font-black text-slate-900 dark:text-white italic tracking-tight">{r.company}</h3>
-                        <Badge className="bg-primary/10 text-primary border-none text-[10px] font-black uppercase tracking-widest px-3 py-1">{r.match} Match</Badge>
-                      </div>
-                      <p className="text-slate-500 dark:text-white/60 text-sm font-medium italic max-w-xl leading-relaxed">"{r.message}"</p>
-                      <div className="flex items-center gap-6 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                         <span className="flex items-center gap-2 bg-slate-50 dark:bg-white/5 px-3 py-1 rounded-lg"><Clock className="h-3 w-3" /> {r.time}</span>
-                         <DealFlowStepper status={r.status as any} />
-                      </div>
-                   </div>
-                </div>
-                
-                <div className="flex gap-4">
-                  {r.status === 'Pending' ? (
-                     <>
-                        <Button 
-                          variant="outline" 
-                          onClick={() => handleAction(r.id, 'Rejected')}
-                          className="rounded-xl border-slate-200 dark:border-white/10 text-red-500 font-black uppercase tracking-widest text-[10px] h-14 px-8 hover:bg-red-500/10 transition-all flex items-center gap-2"
+          {received.length === 0 ? (
+            <EmptyState icon={Inbox} title="No Requests Yet" subtitle="When other businesses send you an intro request, they'll appear here." />
+          ) : (
+            received.map(r => (
+              <div key={r._id} className="p-8 md:p-10 rounded-[2.5rem] bg-white dark:bg-[#0A0A0A] border border-slate-200 dark:border-white/5 group hover:border-primary/20 hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500">
+                <div className="flex flex-col md:flex-row gap-6 md:items-start">
+                  {/* Avatar */}
+                  <div className="h-16 w-16 rounded-[1.25rem] bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 flex items-center justify-center font-black text-2xl text-primary group-hover:bg-primary group-hover:text-white transition-all shrink-0">
+                    {r.senderBizName[0] || "?"}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-3 mb-2">
+                      <h3 className="text-lg font-black text-slate-900 dark:text-white italic tracking-tight">{r.senderBizName}</h3>
+                      <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 font-black uppercase text-[9px] tracking-widest">{r.dealType}</Badge>
+                      <StatusBadge status={r.status} />
+                      {r.matchScore > 0 && (
+                        <span className="text-[10px] font-black text-primary uppercase tracking-widest">{r.matchScore}% Match</span>
+                      )}
+                    </div>
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400 italic mb-1">"{r.message}"</p>
+                    {r.summary && (
+                      <p className="text-xs font-medium text-slate-400 mt-1 mb-2">Opportunity: {r.summary}</p>
+                    )}
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-3">
+                      <Clock className="h-3 w-3" /> {timeAgo(r.createdAt)}
+                    </div>
+
+                    {/* Connection Token (if accepted) */}
+                    {r.status === "accepted" && r.connectionToken && (
+                      <ConnectionTokenCard token={r.connectionToken} partnerName={r.senderBizName} />
+                    )}
+
+                    {/* Action Buttons (only for pending) */}
+                    {r.status === "pending" && (
+                      <div className="flex gap-3 mt-5">
+                        <Button
+                          variant="outline"
+                          className="flex-1 h-11 rounded-xl font-black uppercase tracking-widest text-[10px] border-red-200 text-red-600 hover:bg-red-50 dark:border-white/10 dark:text-red-400 dark:hover:bg-red-500/10 transition-all"
+                          disabled={actionLoading !== null}
+                          onClick={() => handleAction(r._id, "reject", r.senderBizName)}
                         >
-                           <X className="h-4 w-4" /> Reject
+                          {actionLoading === r._id + "reject" ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <><X className="h-4 w-4 mr-1" /> Decline</>
+                          )}
                         </Button>
-                        <Button 
-                          onClick={() => handleAction(r.id, 'Accepted')}
-                          className="bg-primary text-white rounded-xl font-black uppercase tracking-widest text-[10px] h-14 px-10 shadow-xl shadow-primary/20 group-hover:scale-105 transition-all flex items-center gap-2"
+                        <Button
+                          className="flex-1 h-11 rounded-xl bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20 transition-all"
+                          disabled={actionLoading !== null}
+                          onClick={() => handleAction(r._id, "accept", r.senderBizName)}
                         >
-                           <Check className="h-4 w-4" /> Accept Intro
+                          {actionLoading === r._id + "accept" ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <><Check className="h-4 w-4 mr-1" /> Accept</>
+                          )}
                         </Button>
-                     </>
-                  ) : r.status === 'Accepted' ? (
-                    <Link href={`/meetings?schedule=true&partner=${r.company}`}>
-                      <Button className="bg-emerald-500 text-white rounded-xl font-black uppercase tracking-widest text-[10px] h-14 px-10 shadow-xl shadow-emerald-500/20 group-hover:scale-105 transition-all flex items-center gap-2">
-                        <Calendar className="h-4 w-4" /> Schedule Meeting
-                      </Button>
-                    </Link>
-                  ) : null}
+                      </div>
+                    )}
+                  </div>
                 </div>
-             </div>
-           ))}
+              </div>
+            ))
+          )}
         </TabsContent>
 
+        {/* SENT TAB */}
         <TabsContent value="sent" className="space-y-4">
-           {sentRequests.map(r => (
-             <div key={r.id} className="p-10 rounded-[2.5rem] bg-white dark:bg-[#0A0A0A] border border-slate-200 dark:border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-8 opacity-90 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-500">
-                <div className="flex gap-8">
-                   <div className="h-20 w-20 rounded-[1.5rem] bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 flex items-center justify-center font-black text-3xl text-slate-400">
-                      {r.company[0]}
-                   </div>
-                   <div className="space-y-3">
-                      <h3 className="text-2xl font-black text-slate-900 dark:text-white italic tracking-tight">{r.company}</h3>
-                      <p className="text-slate-500 dark:text-white/60 text-sm font-medium italic max-w-xl leading-relaxed">"{r.message}"</p>
-                      <div className="flex items-center gap-6 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                         <span className="flex items-center gap-2 bg-slate-50 dark:bg-white/5 px-3 py-1 rounded-lg"><Clock className="h-3 w-3" /> {r.time}</span>
-                         {r.status === 'Rejected' ? (
-                            <span className="flex items-center gap-2 text-red-500 bg-red-500/10 px-3 py-1 rounded-lg font-black uppercase">Rejected</span>
-                         ) : (
-                            <span className="flex items-center gap-2 text-amber-500 bg-amber-500/10 px-3 py-1 rounded-lg font-black uppercase">Pending Response</span>
-                         )}
-                      </div>
-                   </div>
+          {sent.length === 0 ? (
+            <EmptyState icon={Send} title="No Sent Requests" subtitle="Requests you send from Explore or Matches will appear here." />
+          ) : (
+            sent.map(r => (
+              <div key={r._id} className="p-8 md:p-10 rounded-[2.5rem] bg-white dark:bg-[#0A0A0A] border border-slate-200 dark:border-white/5 group hover:border-primary/20 hover:shadow-xl transition-all duration-500">
+                <div className="flex flex-col md:flex-row gap-6 md:items-start">
+                  {/* Avatar */}
+                  <div className="h-16 w-16 rounded-[1.25rem] bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 flex items-center justify-center font-black text-2xl text-primary group-hover:bg-primary group-hover:text-white transition-all shrink-0">
+                    {r.receiverBizName[0] || "?"}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-3 mb-2">
+                      <h3 className="text-lg font-black text-slate-900 dark:text-white italic tracking-tight">{r.receiverBizName}</h3>
+                      <Badge className="bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-white/40 border-slate-200 dark:border-white/10 font-black uppercase text-[9px] tracking-widest">{r.dealType}</Badge>
+                      <StatusBadge status={r.status} />
+                    </div>
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400 italic mb-1">"{r.message}"</p>
+                    {r.summary && (
+                      <p className="text-xs font-medium text-slate-400 mt-1">Opportunity: {r.summary}</p>
+                    )}
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-3">
+                      <Clock className="h-3 w-3" /> Sent {timeAgo(r.createdAt)}
+                    </div>
+
+                    {/* Connection Token (if accepted by receiver) */}
+                    {r.status === "accepted" && r.connectionToken && (
+                      <ConnectionTokenCard token={r.connectionToken} partnerName={r.receiverBizName} />
+                    )}
+
+                    {r.status === "rejected" && (
+                      <p className="mt-3 text-xs font-medium text-red-500">This request was declined. You may send a new request with a different approach.</p>
+                    )}
+                  </div>
                 </div>
-                <Button variant="ghost" className="rounded-xl font-black uppercase tracking-widest text-[10px] h-14 px-8 hover:bg-slate-50 dark:hover:bg-white/5">
-                  Cancel Request
-                </Button>
-             </div>
-           ))}
+              </div>
+            ))
+          )}
         </TabsContent>
       </Tabs>
     </div>

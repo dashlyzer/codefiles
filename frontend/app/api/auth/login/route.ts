@@ -17,8 +17,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing email or password" }, { status: 400 });
     }
 
+    const normalizedEmail = email.toLowerCase().trim();
+
     // Find user and explicitly select password
-    const user = await User.findOne({ email: email.toLowerCase() }).select("+password");
+    const user = await User.findOne({ email: normalizedEmail }).select("+password");
+
     if (!user) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
