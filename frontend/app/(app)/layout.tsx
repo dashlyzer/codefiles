@@ -119,16 +119,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Menu className="h-5 w-5" />
           </button>
 
-          {/* Search */}
-          <div className="flex-grow max-w-sm hidden sm:block">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search intents, partners, deals..."
-                className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-xl pl-4 pr-4 py-2 text-sm font-medium focus:ring-2 ring-primary transition-all"
-              />
-            </div>
-          </div>
+
 
           {/* Right */}
           <div className="flex items-center gap-2 ml-auto">

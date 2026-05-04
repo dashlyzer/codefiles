@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { 
   MessageSquare, Clock, CheckCircle2, XCircle, 
-  ArrowRight, Check, X, Calendar, Loader2, Inbox, Send, Zap
+  ArrowRight, Check, X, Calendar, Loader2, Inbox, Send, Zap, Star
 } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import { toast } from "sonner"
+import { FeedbackModal } from "@/components/modals/feedback-modal"
 
 interface IntroRequest {
   _id: string
@@ -88,6 +89,7 @@ export default function RequestsPage() {
   const [sent, setSent] = useState<IntroRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [feedbackTarget, setFeedbackTarget] = useState<{ partnerName: string; connectionToken: string } | null>(null)
 
   const fetchRequests = useCallback(async () => {
     if (!user?._id) return
@@ -135,7 +137,14 @@ export default function RequestsPage() {
     }
   }
 
-  const pendingCount = received.filter(r => r.status === "pending").length
+  // Filter logic
+  const receivedRequests = received.filter(r => r.status !== "accepted")
+  const sentRequests = sent.filter(r => r.status !== "accepted")
+  const acceptedRequests = [...received, ...sent]
+    .filter(r => r.status === "accepted")
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+  const pendingCount = receivedRequests.filter(r => r.status === "pending").length
 
   if (isLoading) {
     return (
@@ -152,7 +161,7 @@ export default function RequestsPage() {
         <p className="text-slate-500 dark:text-white/40 font-medium text-sm uppercase tracking-widest font-black">Manage your deal-making introductions</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs defaultValue="received" className="w-full">
         <TabsList className="bg-white dark:bg-[#0A0A0A] p-1 rounded-2xl h-16 mb-8 border border-slate-200 dark:border-white/5 shadow-xl shadow-slate-100 dark:shadow-none">
           <TabsTrigger value="received" className="rounded-xl px-8 md:px-12 h-full font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-primary data-[state=active]:text-white shadow-sm transition-all flex items-center gap-2">
             <Inbox className="h-3.5 w-3.5" />
@@ -160,24 +169,25 @@ export default function RequestsPage() {
           </TabsTrigger>
           <TabsTrigger value="sent" className="rounded-xl px-8 md:px-12 h-full font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-primary data-[state=active]:text-white shadow-sm transition-all flex items-center gap-2">
             <Send className="h-3.5 w-3.5" />
-            Sent ({sent.length})
+            Sent ({sentRequests.length})
+          </TabsTrigger>
+          <TabsTrigger value="accepted" className="rounded-xl px-8 md:px-12 h-full font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-emerald-500 data-[state=active]:text-white shadow-sm transition-all flex items-center gap-2">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Accepted ({acceptedRequests.length})
           </TabsTrigger>
         </TabsList>
 
         {/* RECEIVED TAB */}
         <TabsContent value="received" className="space-y-4">
-          {received.length === 0 ? (
+          {receivedRequests.length === 0 ? (
             <EmptyState icon={Inbox} title="No Requests Yet" subtitle="When other businesses send you an intro request, they'll appear here." />
           ) : (
-            received.map(r => (
+            receivedRequests.map(r => (
               <div key={r._id} className="p-8 md:p-10 rounded-[2.5rem] bg-white dark:bg-[#0A0A0A] border border-slate-200 dark:border-white/5 group hover:border-primary/20 hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500">
                 <div className="flex flex-col md:flex-row gap-6 md:items-start">
-                  {/* Avatar */}
                   <div className="h-16 w-16 rounded-[1.25rem] bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 flex items-center justify-center font-black text-2xl text-primary group-hover:bg-primary group-hover:text-white transition-all shrink-0">
                     {r.senderBizName[0] || "?"}
                   </div>
-
-                  {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-3 mb-2">
                       <h3 className="text-lg font-black text-slate-900 dark:text-white italic tracking-tight">{r.senderBizName}</h3>
@@ -194,13 +204,6 @@ export default function RequestsPage() {
                     <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-3">
                       <Clock className="h-3 w-3" /> {timeAgo(r.createdAt)}
                     </div>
-
-                    {/* Connection Token (if accepted) */}
-                    {r.status === "accepted" && r.connectionToken && (
-                      <ConnectionTokenCard token={r.connectionToken} partnerName={r.senderBizName} />
-                    )}
-
-                    {/* Action Buttons (only for pending) */}
                     {r.status === "pending" && (
                       <div className="flex gap-3 mt-5">
                         <Button
@@ -209,22 +212,14 @@ export default function RequestsPage() {
                           disabled={actionLoading !== null}
                           onClick={() => handleAction(r._id, "reject", r.senderBizName)}
                         >
-                          {actionLoading === r._id + "reject" ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <><X className="h-4 w-4 mr-1" /> Decline</>
-                          )}
+                          {actionLoading === r._id + "reject" ? <Loader2 className="h-4 w-4 animate-spin" /> : <><X className="h-4 w-4 mr-1" /> Decline</>}
                         </Button>
                         <Button
                           className="flex-1 h-11 rounded-xl bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20 transition-all"
                           disabled={actionLoading !== null}
                           onClick={() => handleAction(r._id, "accept", r.senderBizName)}
                         >
-                          {actionLoading === r._id + "accept" ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <><Check className="h-4 w-4 mr-1" /> Accept</>
-                          )}
+                          {actionLoading === r._id + "accept" ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4 mr-1" /> Accept</>}
                         </Button>
                       </div>
                     )}
@@ -237,18 +232,15 @@ export default function RequestsPage() {
 
         {/* SENT TAB */}
         <TabsContent value="sent" className="space-y-4">
-          {sent.length === 0 ? (
+          {sentRequests.length === 0 ? (
             <EmptyState icon={Send} title="No Sent Requests" subtitle="Requests you send from Explore or Matches will appear here." />
           ) : (
-            sent.map(r => (
+            sentRequests.map(r => (
               <div key={r._id} className="p-8 md:p-10 rounded-[2.5rem] bg-white dark:bg-[#0A0A0A] border border-slate-200 dark:border-white/5 group hover:border-primary/20 hover:shadow-xl transition-all duration-500">
                 <div className="flex flex-col md:flex-row gap-6 md:items-start">
-                  {/* Avatar */}
                   <div className="h-16 w-16 rounded-[1.25rem] bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 flex items-center justify-center font-black text-2xl text-primary group-hover:bg-primary group-hover:text-white transition-all shrink-0">
                     {r.receiverBizName[0] || "?"}
                   </div>
-
-                  {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-3 mb-2">
                       <h3 className="text-lg font-black text-slate-900 dark:text-white italic tracking-tight">{r.receiverBizName}</h3>
@@ -262,14 +254,8 @@ export default function RequestsPage() {
                     <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-3">
                       <Clock className="h-3 w-3" /> Sent {timeAgo(r.createdAt)}
                     </div>
-
-                    {/* Connection Token (if accepted by receiver) */}
-                    {r.status === "accepted" && r.connectionToken && (
-                      <ConnectionTokenCard token={r.connectionToken} partnerName={r.receiverBizName} />
-                    )}
-
                     {r.status === "rejected" && (
-                      <p className="mt-3 text-xs font-medium text-red-500">This request was declined. You may send a new request with a different approach.</p>
+                      <p className="mt-3 text-xs font-medium text-red-500">This request was declined.</p>
                     )}
                   </div>
                 </div>
@@ -277,7 +263,61 @@ export default function RequestsPage() {
             ))
           )}
         </TabsContent>
+
+        {/* ACCEPTED TAB */}
+        <TabsContent value="accepted" className="space-y-4">
+          {acceptedRequests.length === 0 ? (
+            <EmptyState icon={CheckCircle2} title="No Connections Yet" subtitle="Accepted requests will appear here with your connection tokens." />
+          ) : (
+            acceptedRequests.map(r => {
+              const isSender = r.senderId === user?._id
+              const partnerName = isSender ? r.receiverBizName : r.senderBizName
+              return (
+                <div key={r._id} className="p-8 md:p-10 rounded-[2.5rem] bg-white dark:bg-[#0A0A0A] border border-slate-200 dark:border-white/5 group hover:border-emerald-500/20 hover:shadow-2xl hover:shadow-emerald-500/5 transition-all duration-500">
+                  <div className="flex flex-col md:flex-row gap-6 md:items-start">
+                    <div className="h-16 w-16 rounded-[1.25rem] bg-emerald-500/5 border border-emerald-500/10 flex items-center justify-center font-black text-2xl text-emerald-500 shrink-0">
+                      {partnerName[0] || "?"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-3 mb-2">
+                        <h3 className="text-lg font-black text-slate-900 dark:text-white italic tracking-tight">{partnerName}</h3>
+                        <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-black uppercase text-[9px] tracking-widest">Connected</Badge>
+                        <Badge className="bg-slate-100 dark:bg-white/5 text-slate-400 font-black uppercase text-[9px] tracking-widest">{isSender ? "Sent by you" : "Received"}</Badge>
+                      </div>
+                      <p className="text-sm font-medium text-slate-600 dark:text-slate-400 italic mb-4">"{r.message}"</p>
+                      {r.connectionToken && (
+                        <ConnectionTokenCard token={r.connectionToken} partnerName={partnerName} />
+                      )}
+                      {/* Rate Partner button */}
+                      <div className="mt-4">
+                        <Button
+                          variant="outline"
+                          className="h-10 px-5 rounded-xl border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 font-black uppercase tracking-widest text-[9px] hover:bg-amber-50 dark:hover:bg-amber-900/10 flex items-center gap-2 transition-all"
+                          onClick={() => setFeedbackTarget({ partnerName, connectionToken: r.connectionToken || "" })}
+                        >
+                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> Rate Partner
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </TabsContent>
       </Tabs>
+
+      {/* Feedback Modal from Accepted tab */}
+      {feedbackTarget && (
+        <FeedbackModal
+          open={!!feedbackTarget}
+          onClose={() => setFeedbackTarget(null)}
+          connectionId={feedbackTarget.connectionToken}
+          partnerName={feedbackTarget.partnerName}
+          onSubmitted={() => setFeedbackTarget(null)}
+        />
+      )}
     </div>
   )
 }
+

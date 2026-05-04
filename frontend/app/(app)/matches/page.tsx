@@ -43,10 +43,10 @@ export default function MatchesPage() {
 
   const filteredMatches = allMatches.filter(match => {
     const name = match.companyName || match.candidateName || ""
-    const matchesSearch = name.toLowerCase().includes(search.toLowerCase()) || 
-                          match.industry.toLowerCase().includes(search.toLowerCase())
+    const matchesSearch = name.toLowerCase().includes(search.toLowerCase()) ||
+      match.industry.toLowerCase().includes(search.toLowerCase())
     const matchesIndustry = industryFilter === "ALL" || match.industry.toUpperCase() === industryFilter
-    
+
     return matchesSearch && matchesIndustry
   })
 
@@ -65,20 +65,20 @@ export default function MatchesPage() {
           <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight italic mb-1">Matches</h1>
           <p className="text-slate-500 dark:text-white/40 font-medium text-xs uppercase tracking-widest font-black">All businesses that match your intent profile</p>
         </div>
-        
+
         <div className="flex items-center gap-3 w-full sm:w-auto">
-           <div className="relative flex-grow sm:flex-grow-0 sm:w-[240px]">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input 
-                placeholder="Search matches..." 
-                className="pl-11 h-11 bg-slate-100 dark:bg-white/5 border-none rounded-2xl font-bold text-sm w-full"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-           </div>
-           <button className="h-11 w-11 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center text-slate-400 hover:text-primary transition-all flex-shrink-0">
-              <Bell className="h-4 w-4" />
-           </button>
+          <div className="relative flex-grow sm:flex-grow-0 sm:w-[240px]">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search matches..."
+              className="pl-11 h-11 bg-slate-100 dark:bg-white/5 border-none rounded-2xl font-bold text-sm w-full"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <button className="h-11 w-11 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center text-slate-400 hover:text-primary transition-all flex-shrink-0">
+            <Bell className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
@@ -86,18 +86,18 @@ export default function MatchesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" className="h-9 px-4 rounded-xl border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[9px] flex items-center gap-1.5 hover:border-primary/50 transition-all">
-             Deal Type <ChevronDown className="h-3 w-3" />
+            Deal Type <ChevronDown className="h-3 w-3" />
           </Button>
           <Button variant="outline" className="h-9 px-4 rounded-xl border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[9px] flex items-center gap-1.5 hover:border-primary/50 transition-all">
-             Industry <ChevronDown className="h-3 w-3" />
+            Industry <ChevronDown className="h-3 w-3" />
           </Button>
           <Button variant="outline" className="h-9 px-4 rounded-xl border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[9px] flex items-center gap-1.5 hover:border-primary/50 transition-all">
-             Score: 70%+ <ChevronDown className="h-3 w-3" />
+            Score: 70%+ <ChevronDown className="h-3 w-3" />
           </Button>
         </div>
-        
+
         <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-           {filteredMatches.length} Companies Found
+          {filteredMatches.length} Companies Found
         </div>
       </div>
 
@@ -105,20 +105,20 @@ export default function MatchesPage() {
       {filteredMatches.length > 0 ? (
         <div className="grid sm:grid-cols-2 gap-5">
           {filteredMatches.map((match) => (
-            <MatchCard 
-              key={match.matchedUserId} 
-              match={match} 
+            <MatchCard
+              key={match.matchedUserId}
+              match={match}
               onRequestIntro={() => {
                 setSelectedCompany({ id: match.matchedUserId, name: match.companyName || match.candidateName, industry: match.industry, verified: match.verified, matchScore: match.score });
                 setIsModalOpen(true);
-              }} 
+              }}
             />
           ))}
         </div>
       ) : (
-        <EmptyState 
-          icon={Users} 
-          title="No Matches Found" 
+        <EmptyState
+          icon={Users}
+          title="No Matches Found"
           description="Try adjusting your filters or search terms to find more strategic partners."
           actionLabel="Clear All Filters"
           onAction={() => {
@@ -130,14 +130,14 @@ export default function MatchesPage() {
       )}
 
       {selectedCompany && (
-        <RequestIntroModal 
-          open={isModalOpen} 
-          onClose={() => setIsModalOpen(false)} 
-          company={selectedCompany} 
+        <RequestIntroModal
+          open={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          company={selectedCompany}
         />
       )}
 
-      
+
       {filteredMatches.length === 0 && (
         <div className="py-20 text-center">
           <p className="text-slate-400 font-black uppercase tracking-widest text-sm">No matches found for your criteria</p>

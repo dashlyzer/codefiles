@@ -5,21 +5,28 @@ import { useSearchParams } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Calendar as CalendarIcon, Clock, Video, Bell, Calendar, ChevronDown, Building2, MapPin, Search } from "lucide-react"
+import { Calendar as CalendarIcon, Clock, Video, Bell, Star, Search } from "lucide-react"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
+import { FeedbackModal } from "@/components/modals/feedback-modal"
+import { useAuth } from "@/components/auth-provider"
 
 function MeetingsContent() {
   const searchParams = useSearchParams()
   const connectionToken = searchParams.get("token")
+  const { user } = useAuth()
 
   const [meetings, setMeetings] = useState<any[]>([])
   const [googleConnected, setGoogleConnected] = useState(false)
   const [googleEmail, setGoogleEmail] = useState("")
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+
+  // Feedback modal state
+  const [feedbackMeeting, setFeedbackMeeting] = useState<any>(null)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   // Scheduling state
   const [isScheduling, setIsScheduling] = useState(!!connectionToken)
@@ -247,7 +254,7 @@ function MeetingsContent() {
                 {/* Meta info row */}
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-5">
                    <div className="flex items-center gap-2">
-                      <Calendar className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                      <CalendarIcon className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                       <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">
                         {format(new Date(m.startTime), "MMM dd, yyyy")}
                       </span>
@@ -265,15 +272,23 @@ function MeetingsContent() {
                 </div>
   
                 {/* Actions */}
-                <div className="flex flex-wrap items-center gap-2">
-                   {m.status === 'SCHEDULED' && (
-                     <a href={m.meetLink} target="_blank" rel="noopener noreferrer">
-                       <Button className="rounded-xl bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest text-[9px] h-10 px-6 shadow-lg shadow-primary/20 flex items-center gap-2 transition-all">
-                          <Video className="h-3 w-3" /> Join Meeting
-                       </Button>
-                     </a>
-                   )}
-                </div>
+                 <div className="flex flex-wrap items-center gap-2">
+                    {m.status === 'SCHEDULED' && (
+                      <a href={m.meetLink} target="_blank" rel="noopener noreferrer">
+                        <Button className="rounded-xl bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest text-[9px] h-10 px-6 shadow-lg shadow-primary/20 flex items-center gap-2 transition-all">
+                           <Video className="h-3 w-3" /> Join Meeting
+                        </Button>
+                      </a>
+                    )}
+                    {/* Leave Feedback always available */}
+                    <Button
+                      variant="outline"
+                      className="rounded-xl border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 font-black uppercase tracking-widest text-[9px] h-10 px-6 hover:bg-amber-50 dark:hover:bg-amber-900/10 flex items-center gap-2 transition-all"
+                      onClick={() => { setFeedbackMeeting(m); setFeedbackOpen(true) }}
+                    >
+                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> Leave Feedback
+                    </Button>
+                 </div>
              </div>
            ))}
         </div>
@@ -290,6 +305,21 @@ function MeetingsContent() {
         <div className="py-16 text-center">
           <p className="text-slate-400 font-black uppercase tracking-widest text-sm animate-pulse">Loading meetings...</p>
         </div>
+      )}
+
+      {/* Feedback Modal */}
+      {feedbackMeeting && (
+        <FeedbackModal
+          open={feedbackOpen}
+          onClose={() => { setFeedbackOpen(false); setFeedbackMeeting(null) }}
+          meetingId={feedbackMeeting._id}
+          partnerName={
+            feedbackMeeting.organizerId?._id === user?._id
+              ? (feedbackMeeting.connectionId?.userBBizName || "Partner")
+              : (feedbackMeeting.connectionId?.userABizName || "Partner")
+          }
+          onSubmitted={fetchMeetings}
+        />
       )}
     </div>
   )

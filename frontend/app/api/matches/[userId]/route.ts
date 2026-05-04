@@ -49,7 +49,7 @@ export async function POST(
       if (overlapScore > 0) {
         // Fetch User to get Name and verified status
         const candidateUser = await User.findById(other.ownerId);
-        
+
         results.push({
           matchedUserId: other.ownerId,
           candidateName: candidateUser?.name || other.ownerName || "Unknown",
