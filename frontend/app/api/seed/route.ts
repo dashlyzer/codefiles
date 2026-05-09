@@ -88,10 +88,10 @@ export async function GET() {
 
     const userCount = await User.countDocuments();
     if (userCount > 10) {
-       return NextResponse.json({
-         success: true,
-         message: `Database already has ${userCount} users. Skipping seed.`,
-       });
+      return NextResponse.json({
+        success: true,
+        message: `Database already has ${userCount} users. Skipping seed.`,
+      });
     }
 
     // 1. Only delete if we are actually seeding (optional, better to just not delete)

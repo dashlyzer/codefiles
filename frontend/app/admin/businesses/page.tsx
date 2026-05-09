@@ -103,7 +103,7 @@ export default function BusinessManagement() {
                           )}
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-white/30 font-medium capitalize">
-                          {biz.industry} • <MapPin className="h-3 w-3" /> {biz.location}
+                          {biz.industry} • <MapPin className="h-3 w-3" /> {typeof biz.location === 'string' ? biz.location : `${biz.location?.city || ''}${biz.location?.city && biz.location?.country ? ', ' : ''}${biz.location?.country || ''}`}
                         </div>
                       </div>
                     </div>

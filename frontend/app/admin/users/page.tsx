@@ -2,12 +2,12 @@
 
 import { useAdminStore } from "@/lib/admin-store"
 import { useAuth } from "@/components/auth-provider"
-import { 
-  Users, 
-  Search, 
-  Trash2, 
-  ShieldCheck, 
-  ShieldX, 
+import {
+  Users,
+  Search,
+  Trash2,
+  ShieldCheck,
+  ShieldX,
   MoreHorizontal,
   Mail,
   Calendar,
@@ -30,8 +30,8 @@ export default function UserManagement() {
   const { isSuperAdmin, user: currentUser } = useAuth()
   const [searchTerm, setSearchTerm] = useState("")
 
-  const filteredUsers = users.filter((u) => 
-    u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredUsers = users.filter((u) =>
+    u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.email.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
@@ -91,22 +91,20 @@ export default function UserManagement() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-black uppercase tracking-widest border ${
-                      user.role === "SUPER_ADMIN" 
-                        ? "bg-red-500/10 text-red-600 border-red-500/20" 
+                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-black uppercase tracking-widest border ${user.role === "SUPER_ADMIN"
+                        ? "bg-red-500/10 text-red-600 border-red-500/20"
                         : user.role === "ADMIN"
-                        ? "bg-orange-500/10 text-orange-600 border-orange-500/20"
-                        : "bg-blue-500/10 text-blue-600 border-blue-500/20"
-                    }`}>
+                          ? "bg-orange-500/10 text-orange-600 border-orange-500/20"
+                          : "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                      }`}>
                       {user.role}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-black uppercase tracking-widest ${
-                      user.status === "ACTIVE" 
-                        ? "bg-emerald-500/10 text-emerald-600" 
+                    <span className={`text-[10px] px-2.5 py-1 rounded-lg font-black uppercase tracking-widest ${user.status === "ACTIVE"
+                        ? "bg-emerald-500/10 text-emerald-600"
                         : "bg-red-500/10 text-red-600"
-                    }`}>
+                      }`}>
                       {user.status}
                     </span>
                   </td>
@@ -141,7 +139,7 @@ export default function UserManagement() {
                             </>
                           )}
                         </DropdownMenuItem>
-                        
+
                         {isSuperAdmin && user.role !== "SUPER_ADMIN" && (
                           <>
                             <DropdownMenuSeparator className="bg-slate-100 dark:bg-white/5 mx-1" />

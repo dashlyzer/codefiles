@@ -4,7 +4,7 @@ const UserSchema = new Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true, select: false },
-  
+
   // Step 1: Owner Details
   designation: { type: String },
   phone: { type: String },

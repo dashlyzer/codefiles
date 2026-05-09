@@ -84,7 +84,7 @@ export default function DashboardPage() {
           </h1>
           {business ? (
             <p className="text-slate-500 dark:text-white/40 font-bold text-sm tracking-wide flex items-center gap-2">
-              <Building2 className="h-4 w-4" /> {business.companyName} • <MapPin className="h-4 w-4" /> {business.location?.city || business.location}
+              <Building2 className="h-4 w-4" /> {business.companyName} • <MapPin className="h-4 w-4" /> {business.location?.city || (typeof business.location === 'string' ? business.location : "Global")}
             </p>
           ) : (
             <p className="text-slate-500 dark:text-white/40 font-bold text-sm tracking-wide">

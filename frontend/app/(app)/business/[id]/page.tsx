@@ -97,7 +97,7 @@ export default function BusinessProfilePage() {
                   <div className="flex flex-wrap items-center gap-6 pt-2">
                      <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
                         <MapPin className="h-4 w-4" />
-                        <span className="font-bold text-sm">{business.location}</span>
+                        <span className="font-bold text-sm">{typeof business.location === 'string' ? business.location : `${business.location?.city || ''}${business.location?.city && business.location?.country ? ', ' : ''}${business.location?.country || ''}`}</span>
                      </div>
                      <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
                         <Globe className="h-4 w-4" />

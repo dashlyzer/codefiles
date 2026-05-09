@@ -9,16 +9,16 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-primary text-white font-bold hover:bg-blue-600 hover:shadow-[0_0_20px_rgba(3,169,244,0.4)] hover:scale-[1.02] active:scale-[0.98]',
+        default: 'bg-primary text-primary-foreground font-bold hover:bg-primary/90 hover:shadow-[0_0_20px_rgba(var(--primary),0.4)] hover:scale-[1.02] active:scale-[0.98]',
         destructive:
-          'bg-red-500 text-white font-bold hover:bg-red-600 hover:shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:scale-[1.02] active:scale-[0.98]',
+          'bg-destructive text-destructive-foreground font-bold hover:bg-destructive/90 hover:shadow-[0_0_20px_rgba(var(--destructive),0.3)] hover:scale-[1.02] active:scale-[0.98]',
         outline:
-          'border border-white/10 bg-white/5 text-white font-bold hover:bg-blue-500 hover:text-white hover:border-blue-500 hover:shadow-[0_0_15px_rgba(3,169,244,0.3)] hover:scale-[1.02] active:scale-[0.98]',
+          'border border-input bg-background text-foreground font-bold hover:bg-accent hover:text-accent-foreground hover:scale-[1.02] active:scale-[0.98] dark:border-white/10 dark:bg-white/5',
         secondary:
-          'bg-white/10 text-white font-bold hover:bg-white/20 hover:scale-[1.02] active:scale-[0.98]',
+          'bg-secondary text-secondary-foreground font-bold hover:bg-secondary/80 hover:scale-[1.02] active:scale-[0.98]',
         ghost:
-          'text-white/40 font-bold hover:bg-blue-500/10 hover:text-white hover:scale-[1.02] active:scale-[0.98]',
-        link: 'text-primary underline-offset-4 hover:text-blue-400 hover:underline transition-all',
+          'text-muted-foreground font-bold hover:bg-accent hover:text-accent-foreground hover:scale-[1.02] active:scale-[0.98]',
+        link: 'text-primary underline-offset-4 hover:underline transition-all',
       },
       size: {
         default: 'h-9 px-4 py-2 has-[>svg]:px-3',

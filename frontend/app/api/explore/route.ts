@@ -8,16 +8,16 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   try {
     await dbConnect();
-    
+
     // Fetch all business profiles
     const businesses = await Business.find({}).lean();
-    
+
     const results = [];
-    
+
     for (const biz of businesses) {
       // Get the associated user to fetch their verified status and name fallback
       const user = await User.findById(biz.ownerId);
-      
+
       results.push({
         id: biz.ownerId,
         companyName: biz.companyName || user?.name || "Unknown Company",

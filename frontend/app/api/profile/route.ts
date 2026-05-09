@@ -31,7 +31,7 @@ async function getAuthenticatedUser() {
 export async function GET(req: Request) {
   try {
     await connectToDatabase();
-    
+
     const user = await getAuthenticatedUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -63,7 +63,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     await connectToDatabase();
-    
+
     const user = await getAuthenticatedUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -137,7 +137,7 @@ export async function POST(req: Request) {
         verificationStatus: business.trust?.verificationStatus ?? "Not Verified",
       };
     }
-    
+
     // ── 3. Recalculate Profile Score ──
     let score = 0;
     if (user.name && user.phone) score += 15;

@@ -356,7 +356,7 @@ export default function ExplorePage() {
             >
               Request Intro
             </Button>
-            <Button 
+            <Button
               variant="outline"
               className="h-10 px-6 rounded-xl font-black uppercase tracking-widest text-[10px] border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors hidden sm:flex"
               onClick={(e) => {
