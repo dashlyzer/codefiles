@@ -372,12 +372,20 @@ export default function ProfilePage() {
 // MODALS COMPONENTS
 // -------------------------------------------------------------
 
-function TagEditorModal({ type, industry, currentTags, onClose, onSave }: any) {
+interface TagEditorModalProps {
+   type: "offerings" | "needs";
+   industry: string;
+   currentTags: string[];
+   onClose: () => void;
+   onSave: (tags: string[]) => void;
+}
+
+function TagEditorModal({ type, industry, currentTags, onClose, onSave }: TagEditorModalProps) {
    const [tags, setTags] = useState<string[]>(currentTags)
    const [input, setInput] = useState("")
 
    const isOfferings = type === "offerings"
-   const suggestions = INDUSTRY_SUGGESTIONS[industry]?.[type] || DEFAULT_SUGGESTIONS[isOfferings ? "offerings" : "needs"]
+   const suggestions = INDUSTRY_SUGGESTIONS[industry]?.[type] || DEFAULT_SUGGESTIONS[type]
 
    const handleAdd = (val: string) => {
       const t = val.trim()

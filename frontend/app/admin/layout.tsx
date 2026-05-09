@@ -33,10 +33,10 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-black text-slate-900 dark:text-white transition-colors duration-500">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#030303] text-slate-900 dark:text-white transition-colors duration-500">
       <AdminSidebar />
-      <main className="lg:pl-64 transition-all duration-300">
-        <div className="p-6 lg:p-8">{children}</div>
+      <main className="lg:pl-64 transition-all duration-300 min-h-screen">
+        <div className="p-6 lg:p-8 max-w-[1400px]">{children}</div>
       </main>
     </div>
   )

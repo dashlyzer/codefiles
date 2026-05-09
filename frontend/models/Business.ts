@@ -1,5 +1,10 @@
 import mongoose, { Schema, model, models } from "mongoose";
 
+// @deprecated — This model is being migrated into the User model.
+// DO NOT add new fields here. Use User model for all new business data.
+// Scheduled for removal in Phase 3 after full data migration is complete.
+// See implementation_plan.md for migration details.
+
 const BusinessSchema = new Schema({
   ownerId: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true },
   ownerName: { type: String },
