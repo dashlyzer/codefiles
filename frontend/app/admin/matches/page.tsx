@@ -1,63 +1,47 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Handshake, TrendingUp, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from "lucide-react"
+import { useEffect, useState, useCallback } from "react"
+import { Handshake, Search, AlertTriangle, ChevronLeft, ChevronRight, BarChart3 } from "lucide-react"
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts"
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
+import { SectionCard, SkeletonRow } from "@/components/admin/SectionCard"
+import { EmptyState } from "@/components/admin/EmptyState"
 
-interface MatchItem {
+interface MatchRecord {
   _id: string
-  userId: { _id: string; name: string; email: string } | null
-  matchedUserId: { _id: string; name: string; email: string } | null
+  userId: { name: string; email: string }
+  matchedUserId: { name: string; email: string }
   score: number
   reasons: string[]
   outcome: string
   createdAt: string
+  updatedAt: string
 }
 
-const outcomeColors: Record<string, string> = {
-  Meeting: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  Partnership: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-  ClientDeal: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-  VendorDeal: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
-  Ignored: "bg-slate-100 text-slate-500 dark:bg-white/5 dark:text-white/40",
-  NoOutcome: "bg-slate-100 text-slate-400 dark:bg-white/5 dark:text-white/30",
-  "": "bg-slate-100 text-slate-400 dark:bg-white/5 dark:text-white/30",
-}
-
-function ScoreBadge({ score }: { score: number }) {
-  const bg = score >= 75 ? "bg-emerald-500" : score >= 50 ? "bg-amber-500" : "bg-red-500"
-  return (
-    <span className={`inline-flex items-center justify-center h-7 w-12 rounded-lg text-xs font-black text-white ${bg}`}>
-      {score}
-    </span>
-  )
-}
-
-function SkeletonRow() {
-  return (
-    <tr className="border-b border-slate-100 dark:border-white/5">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <td key={i} className="px-4 py-3">
-          <div className="h-4 bg-slate-100 dark:bg-white/5 rounded animate-pulse" />
-        </td>
-      ))}
-    </tr>
-  )
+const chartTheme = {
+  tooltip: {
+    contentStyle: { background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", color: "#fff" },
+    labelStyle: { fontWeight: 800, color: "#fff" },
+  },
+  text: { fill: "rgba(148,163,184,0.8)", fontSize: 11, fontWeight: 700 },
 }
 
 export default function AdminMatchesPage() {
-  const [matches, setMatches] = useState<MatchItem[]>([])
+  const [matches, setMatches] = useState<MatchRecord[]>([])
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [outcome, setOutcome] = useState("")
+  const [search, setSearch] = useState("")
+  const [outcomeFilter, setOutcomeFilter] = useState("")
   const [page, setPage] = useState(1)
   const [pages, setPages] = useState(1)
   const [total, setTotal] = useState(0)
 
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams({ page: page.toString(), limit: "15" })
-      if (outcome) params.set("outcome", outcome)
+      const params = new URLSearchParams({ page: String(page), limit: "20" })
+      if (search) params.set("search", search)
+      if (outcomeFilter) params.set("outcome", outcomeFilter)
       const res = await fetch(`/api/admin/matches?${params}`)
       const data = await res.json()
       setMatches(data.matches || [])
@@ -66,114 +50,139 @@ export default function AdminMatchesPage() {
       setTotal(data.total || 0)
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
-  }
+  }, [page, search, outcomeFilter])
 
-  useEffect(() => { fetchData() }, [page, outcome])
+  useEffect(() => { fetchData() }, [fetchData])
 
-  const outcomes = ["", "Meeting", "Partnership", "ClientDeal", "VendorDeal", "Ignored", "NoOutcome"]
-  const outcomeCounts = stats?.outcomeCounts || {}
+  const bucketData = (stats?.scoreBuckets || []).map((b: any) => ({
+    range: `${b._id}–${b._id + 10}`,
+    count: b.count,
+  }))
 
   return (
-    <div className="space-y-6 pb-16">
-      <div>
-        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Matches</h1>
-        <p className="text-sm font-bold text-slate-500 dark:text-white/40 mt-1">Match engine output — synergy scores and real-world outcomes.</p>
-      </div>
+    <div className="space-y-6 pb-20">
+      <AdminPageHeader title="Match Engine Monitor" subtitle="Monitor synergy generation and quality distribution." />
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Total Matches", value: total, icon: Handshake, color: "text-purple-500" },
-          { label: "Avg Match Score", value: stats?.avgScore ?? "—", icon: TrendingUp, color: "text-blue-500" },
-          { label: "Led to Meeting", value: outcomeCounts["Meeting"] ?? 0, icon: CheckCircle2, color: "text-emerald-500" },
-          { label: "Ignored", value: outcomeCounts["Ignored"] ?? 0, icon: XCircle, color: "text-slate-400" },
-        ].map((c) => (
-          <div key={c.label} className="bg-white dark:bg-[#0A0A0A] rounded-2xl border border-slate-200 dark:border-white/5 p-5">
-            <c.icon className={`h-5 w-5 ${c.color} mb-3`} />
-            <p className="text-2xl font-black text-slate-900 dark:text-white">{c.value}</p>
-            <p className="text-xs font-bold text-slate-400 dark:text-white/30 mt-0.5">{c.label}</p>
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Stats */}
+        <div className="lg:col-span-1 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { label: "Total Matches", value: stats?.total ?? "—", color: "text-blue-500" },
+              { label: "Avg Score", value: stats?.avgScore ? `${Math.round(stats.avgScore)}%` : "—", color: "text-purple-500" },
+              { label: "Led to Meeting", value: stats?.meetingScheduled ?? "—", color: "text-emerald-500" },
+              { label: "Ignored", value: stats?.ignored ?? "—", color: "text-slate-500" },
+            ].map((s) => (
+              <div key={s.label} className="bg-white dark:bg-[#0A0A0A] rounded-2xl border border-slate-200 dark:border-white/5 p-4">
+                <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-0.5">{s.label}</p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-
-      {/* Outcome filter tabs */}
-      <div className="flex flex-wrap gap-2">
-        {outcomes.map((o) => (
-          <button
-            key={o}
-            onClick={() => { setOutcome(o); setPage(1) }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${outcome === o
-              ? "bg-red-600 text-white shadow-[0_0_10px_rgba(220,38,38,0.3)]"
-              : "bg-white dark:bg-[#0A0A0A] border border-slate-200 dark:border-white/10 text-slate-600 dark:text-white/50 hover:border-red-400"
-              }`}
-          >
-            {o || "All Outcomes"}
-            {o && outcomeCounts[o] ? <span className="ml-1.5 opacity-70">({outcomeCounts[o]})</span> : null}
-          </button>
-        ))}
-      </div>
-
-      {/* Table */}
-      <div className="bg-white dark:bg-[#0A0A0A] rounded-2xl border border-slate-200 dark:border-white/5 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 dark:border-white/5">
-          <p className="text-sm font-black text-slate-900 dark:text-white">{total} matches</p>
         </div>
+
+        {/* Histogram */}
+        <div className="lg:col-span-2">
+          <SectionCard title="Score Distribution" subtitle="All-time match quality distribution">
+            {bucketData.length === 0 ? (
+              <EmptyState icon={BarChart3} title="No score data" description="Waiting for match generations." size="sm" />
+            ) : (
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={bucketData} barCategoryGap="20%">
+                  <XAxis dataKey="range" tick={{ ...chartTheme.text, fontSize: 9 }} axisLine={false} tickLine={false} />
+                  <Tooltip {...chartTheme.tooltip} />
+                  <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </SectionCard>
+        </div>
+      </div>
+
+      {/* Filter Row */}
+      <div className="flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-48">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} placeholder="Search by name, email…"
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0A0A0A] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-purple-500/30" />
+        </div>
+        <select value={outcomeFilter} onChange={(e) => { setOutcomeFilter(e.target.value); setPage(1) }}
+          className="px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0A0A0A] text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/30">
+          <option value="">All Outcomes</option>
+          <option value="pending">Pending</option>
+          <option value="viewed">Viewed</option>
+          <option value="request_sent">Request Sent</option>
+          <option value="meeting_scheduled">Meeting Scheduled</option>
+          <option value="ignored">Ignored</option>
+        </select>
+      </div>
+
+      <SectionCard noPadding>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-slate-100 dark:border-white/5">
-                {["User", "Matched With", "Score", "Outcome", "Reasons", "Date"].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white/30">{h}</th>
+              <tr className="border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/2">
+                {["Match ID", "Business A", "Business B", "Score", "Reasons", "Outcome", "Date"].map((h) => (
+                  <th key={h} className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white/25">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody>
-              {loading
-                ? Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
-                : matches.length === 0
-                  ? <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-400 dark:text-white/30 font-bold text-sm">No matches found</td></tr>
-                  : matches.map((m) => (
-                    <tr key={m._id} className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/2 transition-colors">
-                      <td className="px-4 py-3">
-                        <p className="font-bold text-slate-900 dark:text-white">{m.userId?.name || "—"}</p>
-                        <p className="text-xs text-slate-400">{m.userId?.email || ""}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="font-bold text-slate-900 dark:text-white">{m.matchedUserId?.name || "—"}</p>
-                        <p className="text-xs text-slate-400">{m.matchedUserId?.email || ""}</p>
-                      </td>
-                      <td className="px-4 py-3"><ScoreBadge score={m.score} /></td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${outcomeColors[m.outcome] || outcomeColors[""]}`}>
-                          {m.outcome || "No Outcome"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-500 dark:text-white/40 max-w-[200px] truncate">
-                        {m.reasons?.join(", ") || "—"}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-400 dark:text-white/30">
-                        {new Date(m.createdAt).toLocaleDateString("en-IN")}
-                      </td>
-                    </tr>
-                  ))
-              }
+            <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+              {loading ? (
+                Array.from({ length: 10 }).map((_, i) => <SkeletonRow key={i} cols={7} />)
+              ) : matches.length === 0 ? (
+                <tr><td colSpan={7}><EmptyState icon={Handshake} title="No matches found" description="Adjust your filters." /></td></tr>
+              ) : (
+                matches.map((m) => (
+                  <tr key={m._id} className="hover:bg-slate-50 dark:hover:bg-white/2 transition-colors">
+                    <td className="px-4 py-3 text-[10px] font-mono text-slate-400">{m._id.slice(-6)}</td>
+                    <td className="px-4 py-3">
+                      <p className="text-sm font-bold text-slate-800 dark:text-white/80">{m.userId?.name || "—"}</p>
+                      <p className="text-[11px] text-slate-400">{m.userId?.email}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-sm font-bold text-slate-800 dark:text-white/80">{m.matchedUserId?.name || "—"}</p>
+                      <p className="text-[11px] text-slate-400">{m.matchedUserId?.email}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
+                        m.score >= 80 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                        : m.score >= 50 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                        : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                      }`}>
+                        {m.score}%
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1 flex-wrap max-w-[200px]">
+                        {m.reasons?.slice(0, 2).map((r, i) => (
+                          <span key={i} className="text-[9px] font-bold text-slate-500 dark:text-white/40 bg-slate-100 dark:bg-white/5 px-1.5 py-0.5 rounded">{r}</span>
+                        ))}
+                        {(m.reasons?.length || 0) > 2 && <span className="text-[9px] font-bold text-slate-500">+{m.reasons.length - 2}</span>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/40">{m.outcome || "pending"}</span>
+                    </td>
+                    <td className="px-4 py-3 text-xs font-bold text-slate-400">
+                      {new Date(m.createdAt).toLocaleDateString("en-IN")}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
         {pages > 1 && (
-          <div className="flex items-center justify-between px-6 py-3 border-t border-slate-100 dark:border-white/5">
-            <p className="text-xs text-slate-400 dark:text-white/30 font-bold">Page {page} of {pages}</p>
+          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-white/5">
+            <p className="text-xs font-bold text-slate-400">Page {page} of {pages} ({total})</p>
             <div className="flex gap-2">
-              <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="p-1.5 rounded-lg border border-slate-200 dark:border-white/10 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-white/5">
-                <ChevronLeft className="h-4 w-4 text-slate-600 dark:text-white/60" />
-              </button>
-              <button disabled={page === pages} onClick={() => setPage(p => p + 1)} className="p-1.5 rounded-lg border border-slate-200 dark:border-white/10 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-white/5">
-                <ChevronRight className="h-4 w-4 text-slate-600 dark:text-white/60" />
-              </button>
+              <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button>
+              <button disabled={page === pages} onClick={() => setPage(p => p + 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button>
             </div>
           </div>
         )}
-      </div>
+      </SectionCard>
     </div>
   )
 }

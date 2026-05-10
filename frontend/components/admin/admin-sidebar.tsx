@@ -4,20 +4,24 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
-  LayoutDashboard, Users, ShieldCheck, Target, Handshake,
-  MessageSquare, Calendar, Star, Search, Flag,
-  BarChart3, Bell, Settings, LogOut, ChevronLeft,
-  ChevronRight, ShieldAlert, ScrollText, CreditCard
+  LayoutDashboard, Cpu, Users, ShieldCheck, Target, Star, Flag,
+  Handshake, MessageSquare, Calendar, Search, Sparkles,
+  CreditCard, Bell, HeadphonesIcon, Image, BarChart3,
+  Settings, Shield, ScrollText, ChevronLeft, ChevronRight,
+  LogOut, ShieldAlert
 } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
 import { ModeToggle } from "@/components/mode-toggle"
+import { adminModules, ModuleStatus } from "@/config/adminModules"
+import { ModuleStatusBadge } from "@/components/admin/ModulePlaceholder"
 
 type NavItem = {
   name: string
   href: string
   icon: React.ElementType
+  moduleKey: string
 }
 
 type NavGroup = {
@@ -29,56 +33,46 @@ const navGroups: NavGroup[] = [
   {
     label: "Overview",
     items: [
-      { name: "Dashboard",         href: "/admin",                    icon: LayoutDashboard },
+      { name: "Dashboard",                   href: "/admin",                    icon: LayoutDashboard, moduleKey: "dashboard" },
+      { name: "Network Ops Center",          href: "/admin/noc",                icon: Cpu,             moduleKey: "noc" },
     ],
   },
   {
-    label: "People",
+    label: "User Management",
     items: [
-      { name: "Users",             href: "/admin/users",              icon: Users },
-      { name: "Verification",      href: "/admin/verification",       icon: ShieldCheck },
-      { name: "Profiles & Intent", href: "/admin/profiles",          icon: Target },
+      { name: "Users",                       href: "/admin/users",              icon: Users,           moduleKey: "users" },
+      { name: "Business Verification",       href: "/admin/verification",       icon: ShieldCheck,     moduleKey: "verification" },
+      { name: "Profiles & Intent",           href: "/admin/profiles",           icon: Target,          moduleKey: "profilesIntent" },
+      { name: "Ratings & Feedback",          href: "/admin/ratings",            icon: Star,            moduleKey: "ratings" },
+      { name: "Reports & Flags",             href: "/admin/flags",              icon: Flag,            moduleKey: "reportsFlags" },
     ],
   },
   {
-    label: "Activity",
+    label: "Network & Matching",
     items: [
-      { name: "Matches",           href: "/admin/matches",            icon: Handshake },
-      { name: "Requests",          href: "/admin/requests",           icon: MessageSquare },
-      { name: "Meetings",          href: "/admin/meetings",           icon: Calendar },
-      { name: "Ratings",           href: "/admin/ratings",            icon: Star },
+      { name: "Matches",                     href: "/admin/matches",            icon: Handshake,       moduleKey: "matches" },
+      { name: "Requests",                    href: "/admin/requests",           icon: MessageSquare,   moduleKey: "requests" },
+      { name: "Meetings",                    href: "/admin/meetings",           icon: Calendar,        moduleKey: "meetings" },
+      { name: "Explore Monitoring",          href: "/admin/explore-monitoring", icon: Search,          moduleKey: "exploreMonitoring" },
+      { name: "AI Match Insights",           href: "/admin/ai-insights",        icon: Sparkles,        moduleKey: "aiInsights" },
     ],
   },
   {
-    label: "Monitoring",
+    label: "Business Operations",
     items: [
-      { name: "Explore Monitor",   href: "/admin/explore-monitoring", icon: Search },
-      { name: "Reports & Flags",   href: "/admin/flags",              icon: Flag },
+      { name: "Subscriptions",               href: "/admin/subscriptions",      icon: CreditCard,      moduleKey: "subscriptions" },
+      { name: "Notifications",               href: "/admin/notifications",      icon: Bell,            moduleKey: "notifications" },
+      { name: "Support & Tickets",           href: "/admin/support",            icon: HeadphonesIcon,  moduleKey: "supportTickets" },
+      { name: "Content & Banners",           href: "/admin/content",            icon: Image,           moduleKey: "contentBanners" },
     ],
   },
   {
-    label: "Monetization",
+    label: "System Control",
     items: [
-      { name: "Subscriptions",     href: "/admin/subscriptions",      icon: CreditCard },
-    ],
-  },
-  {
-    label: "Intelligence",
-    items: [
-      { name: "Analytics",         href: "/admin/analytics",          icon: BarChart3 },
-    ],
-  },
-  {
-    label: "Comms",
-    items: [
-      { name: "Notifications",     href: "/admin/notifications",      icon: Bell },
-    ],
-  },
-  {
-    label: "System",
-    items: [
-      { name: "Settings",          href: "/admin/settings",           icon: Settings },
-      { name: "Activity Logs",     href: "/admin/activity-logs",      icon: ScrollText },
+      { name: "Analytics",                   href: "/admin/analytics",          icon: BarChart3,       moduleKey: "analytics" },
+      { name: "System Settings",             href: "/admin/settings",           icon: Settings,        moduleKey: "systemSettings" },
+      { name: "Admins & Roles",              href: "/admin/admins",             icon: Shield,          moduleKey: "adminsRoles" },
+      { name: "Activity Logs",               href: "/admin/activity-logs",      icon: ScrollText,      moduleKey: "activityLogs" },
     ],
   },
 ]
@@ -90,6 +84,16 @@ export function AdminSidebar() {
 
   const isActive = (href: string) =>
     href === "/admin" ? pathname === "/admin" : pathname.startsWith(href)
+
+  const shouldShowItem = (item: NavItem): boolean => {
+    const mod = adminModules[item.moduleKey]
+    if (!mod) return false
+    if (!mod.visible) return false
+    if (mod.status === "disabled") return false
+    // Internal modules only visible to super admins
+    if (mod.status === "internal" && !isSuperAdmin) return false
+    return true
+  }
 
   return (
     <aside
@@ -105,9 +109,14 @@ export function AdminSidebar() {
             <ShieldAlert className="h-4 w-4 text-white" />
           </div>
           {!collapsed && (
-            <span className="font-black tracking-tight text-slate-900 dark:text-white text-sm">
-              TapAdmin
-            </span>
+            <div>
+              <span className="font-black tracking-tight text-slate-900 dark:text-white text-sm block leading-none">
+                TapAdmin
+              </span>
+              <span className="text-[8px] font-black text-red-500/70 uppercase tracking-widest">
+                Intent OS
+              </span>
+            </div>
           )}
         </Link>
         <div className="flex items-center gap-1">
@@ -127,41 +136,52 @@ export function AdminSidebar() {
       </div>
 
       {/* ── Navigation ── */}
-      <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-5">
-        {navGroups.map((group) => (
-          <div key={group.label}>
-            {!collapsed && (
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-white/20 px-3 mb-1.5">
-                {group.label}
-              </p>
-            )}
-            <div className="space-y-0.5">
-              {group.items.map((item) => {
-                const active = isActive(item.href)
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    title={collapsed ? item.name : undefined}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-bold transition-all",
-                      active
-                        ? "bg-red-600 text-white shadow-[0_0_12px_rgba(220,38,38,0.2)]"
-                        : "text-slate-600 dark:text-white/50 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white",
-                      collapsed && "justify-center px-2"
-                    )}
-                  >
-                    <item.icon className="h-4 w-4 shrink-0" />
-                    {!collapsed && <span className="truncate">{item.name}</span>}
-                  </Link>
-                )
-              })}
+      <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-5 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-white/5">
+        {navGroups.map((group) => {
+          const visibleItems = group.items.filter(shouldShowItem)
+          if (visibleItems.length === 0) return null
+          return (
+            <div key={group.label}>
+              {!collapsed && (
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-white/20 px-3 mb-1.5">
+                  {group.label}
+                </p>
+              )}
+              <div className="space-y-0.5">
+                {visibleItems.map((item) => {
+                  const mod = adminModules[item.moduleKey]
+                  const status = mod?.status as ModuleStatus
+                  const active = isActive(item.href)
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      title={collapsed ? item.name : undefined}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-bold transition-all",
+                        active
+                          ? "bg-red-600 text-white shadow-[0_0_12px_rgba(220,38,38,0.2)]"
+                          : "text-slate-600 dark:text-white/50 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white",
+                        collapsed && "justify-center px-2"
+                      )}
+                    >
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      {!collapsed && (
+                        <>
+                          <span className="truncate flex-1">{item.name}</span>
+                          {!active && <ModuleStatusBadge status={status} />}
+                        </>
+                      )}
+                    </Link>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </nav>
 
-      {/* ── Bottom: User Mode + Log Out ── */}
+      {/* ── Bottom ── */}
       <div className="px-2 py-3 border-t border-slate-100 dark:border-white/5 space-y-0.5 shrink-0">
         <Link
           href="/dashboard"
