@@ -32,7 +32,7 @@ export default function AdminRolesPage() {
       await fetch("/api/admin/admins", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetAdminId, newRole, adminId: user?._id || user?.id }),
+        body: JSON.stringify({ targetAdminId, newRole, adminId: user?._id }),
       })
       await fetchData()
     } catch (e) { console.error(e) }
@@ -94,7 +94,7 @@ export default function AdminRolesPage() {
                     </p>
                   </div>
                   
-                  {isSuperAdmin && a._id !== user?._id && a._id !== user?.id ? (
+                  {isSuperAdmin && a._id !== user?._id ? (
                     <select
                       value={a.role}
                       onChange={(e) => changeRole(a._id, e.target.value)}

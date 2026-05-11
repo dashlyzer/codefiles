@@ -14,7 +14,6 @@ export default function AdminSettingsPage() {
         title="Settings API Migration"
         description="Global system settings are being migrated to the unified config API. Please use environment variables in the meantime."
         status="internal"
-        icon={Settings}
       />
 
       {/* Static Mockup for future implementation */}

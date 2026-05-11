@@ -3,10 +3,10 @@
 import { useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Zap, Mail, Lock, User, ArrowLeft, Loader2 } from "lucide-react"
+import { Zap, Mail, Lock, User, ArrowLeft, Loader2, Phone, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "@/components/auth-provider"
 
@@ -17,22 +17,30 @@ function AuthContent() {
   const [isLoading, setIsLoading] = useState(false)
   const { signIn, signUp } = useAuth()
 
-  // Form states
+  // Shared fields
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [name, setName] = useState("")
+  const [phone, setPhone] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
+
+  // Sign up only
+  const [name, setName] = useState("")
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email || !password) {
+    if (!email || !password || !phone) {
       setError("Please fill in all fields")
+      return
+    }
+    if (!/^\d{10}$/.test(phone.replace(/\s/g, ""))) {
+      setError("Phone number must be exactly 10 digits")
       return
     }
     setError("")
     setIsLoading(true)
     try {
-      await signIn(email, password)
+      await signIn(email, password, phone.replace(/\D/g, ""))
     } catch (err: any) {
       setError(err.message || "Failed to sign in. Please check your credentials.")
     } finally {
@@ -42,21 +50,23 @@ function AuthContent() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email || !password || !name) {
+    if (!email || !password || !name || !phone) {
       setError("Please fill in all fields")
       return
     }
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       setError("Please enter a valid email address")
       return
     }
-
+    if (!/^\d{10}$/.test(phone.replace(/\s/g, ""))) {
+      setError("Phone number must be exactly 10 digits")
+      return
+    }
     setError("")
     setIsLoading(true)
     try {
-      await signUp(email, name, password)
+      await signUp(email, name, password, phone.replace(/\D/g, ""))
     } catch (err: any) {
       setError(err.message || "Failed to create account. Please try again.")
     } finally {
@@ -64,11 +74,14 @@ function AuthContent() {
     }
   }
 
+  const inputCls = "pl-11 h-12 bg-slate-100/50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white rounded-xl focus-visible:ring-primary/20 font-medium"
+  const labelCls = "text-[10px] font-black text-slate-400 dark:text-white/40 uppercase tracking-[0.2em] ml-1"
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-black flex flex-col items-center justify-center p-6 sm:p-8 transition-colors">
       {/* Back to Home */}
-      <Link 
-        href="/" 
+      <Link
+        href="/"
         className="absolute top-8 left-8 flex items-center gap-2 text-sm font-black text-slate-400 dark:text-white/40 hover:text-slate-900 dark:hover:text-white transition-all uppercase tracking-widest"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -88,23 +101,24 @@ function AuthContent() {
         </div>
 
         <Card className="border-slate-200 dark:border-white/10 bg-white/50 dark:bg-[#0A0A0A] backdrop-blur-xl shadow-2xl rounded-[32px] overflow-hidden">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setError(""); setShowPassword(false) }} className="w-full">
             <TabsList className="grid w-full grid-cols-2 bg-slate-100/50 dark:bg-white/5 p-1 rounded-none h-14">
-              <TabsTrigger 
-                value="signin" 
+              <TabsTrigger
+                value="signin"
                 className="font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:text-primary rounded-none transition-all"
               >
                 Sign In
               </TabsTrigger>
-              <TabsTrigger 
-                value="signup" 
+              <TabsTrigger
+                value="signup"
                 className="font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:text-primary rounded-none transition-all"
               >
                 Sign Up
               </TabsTrigger>
             </TabsList>
-            
+
             <CardContent className="p-8 sm:p-10">
+              {/* ─── SIGN IN ─── */}
               <TabsContent value="signin" className="mt-0 space-y-6">
                 <div className="space-y-2 text-center mb-8">
                   <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Welcome Back</h2>
@@ -112,33 +126,61 @@ function AuthContent() {
                 </div>
 
                 <form onSubmit={handleSignIn} className="space-y-5">
+                  {/* Email */}
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 dark:text-white/40 uppercase tracking-[0.2em] ml-1">Email Address</label>
+                    <label className={labelCls}>Email Address</label>
                     <div className="relative group">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
-                      <Input 
-                        type="email" 
-                        placeholder="john@company.com" 
-                        className="pl-11 h-12 bg-slate-100/50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white rounded-xl focus-visible:ring-primary/20 font-medium"
+                      <Input
+                        type="email"
+                        placeholder="john@company.com"
+                        className={inputCls}
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
                       />
                     </div>
                   </div>
+
+                  {/* Password */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between px-1">
-                      <label className="text-[10px] font-black text-slate-400 dark:text-white/40 uppercase tracking-[0.2em]">Password</label>
+                      <label className={labelCls}>Password</label>
                       <button type="button" className="text-[10px] font-black text-primary hover:text-primary/80 uppercase tracking-widest transition-colors">Forgot?</button>
                     </div>
                     <div className="relative group">
                       <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
-                      <Input 
-                        type="password" 
-                        placeholder="••••••••" 
-                        className="pl-11 h-12 bg-slate-100/50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white rounded-xl focus-visible:ring-primary/20 font-medium"
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        className={`${inputCls} pr-11`}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white/60 transition-colors"
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Phone */}
+                  <div className="space-y-2">
+                    <label className={labelCls}>Mobile Number (10 digits)</label>
+                    <div className="relative group">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                      <Input
+                        type="tel"
+                        placeholder="9876543210"
+                        maxLength={10}
+                        className={inputCls}
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                         required
                       />
                     </div>
@@ -152,6 +194,7 @@ function AuthContent() {
                 </form>
               </TabsContent>
 
+              {/* ─── SIGN UP ─── */}
               <TabsContent value="signup" className="mt-0 space-y-6">
                 <div className="space-y-2 text-center mb-8">
                   <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Create Account</h2>
@@ -159,46 +202,77 @@ function AuthContent() {
                 </div>
 
                 <form onSubmit={handleSignUp} className="space-y-5">
+                  {/* Name */}
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 dark:text-white/40 uppercase tracking-[0.2em] ml-1">Full Name</label>
+                    <label className={labelCls}>Full Name</label>
                     <div className="relative group">
                       <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
-                      <Input 
-                        placeholder="John Doe" 
-                        className="pl-11 h-12 bg-slate-100/50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white rounded-xl focus-visible:ring-primary/20 font-medium"
+                      <Input
+                        placeholder="John Doe"
+                        className={inputCls}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         required
                       />
                     </div>
                   </div>
+
+                  {/* Email */}
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 dark:text-white/40 uppercase tracking-[0.2em] ml-1">Work Email</label>
+                    <label className={labelCls}>Work Email</label>
                     <div className="relative group">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
-                      <Input 
-                        type="email" 
-                        placeholder="john@company.com" 
-                        className="pl-11 h-12 bg-slate-100/50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white rounded-xl focus-visible:ring-primary/20 font-medium"
+                      <Input
+                        type="email"
+                        placeholder="john@company.com"
+                        className={inputCls}
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
                       />
                     </div>
                   </div>
+
+                  {/* Password */}
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 dark:text-white/40 uppercase tracking-[0.2em] ml-1">Password</label>
+                    <label className={labelCls}>Password</label>
                     <div className="relative group">
                       <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
-                      <Input 
-                        type="password" 
-                        placeholder="Create a strong password" 
-                        className="pl-11 h-12 bg-slate-100/50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white rounded-xl focus-visible:ring-primary/20 font-medium"
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Create a strong password"
+                        className={`${inputCls} pr-11`}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white/60 transition-colors"
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
                     </div>
+                  </div>
+
+                  {/* Phone */}
+                  <div className="space-y-2">
+                    <label className={labelCls}>Mobile Number (10 digits)</label>
+                    <div className="relative group">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                      <Input
+                        type="tel"
+                        placeholder="9876543210"
+                        maxLength={10}
+                        className={inputCls}
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                        required
+                      />
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-400 dark:text-white/30 ml-1">Used for identity verification on every sign in</p>
                   </div>
 
                   {error && <p className="text-[11px] text-red-500 font-bold uppercase tracking-widest text-center animate-in fade-in zoom-in duration-300">{error}</p>}
@@ -212,20 +286,20 @@ function AuthContent() {
 
             <CardFooter className="bg-slate-50 dark:bg-white/[0.02] border-t border-slate-200 dark:border-white/10 p-6 flex flex-col gap-4">
               <p className="text-[10px] text-slate-400 dark:text-white/30 font-bold text-center uppercase tracking-widest leading-relaxed">
-                By continuing, you agree to Taplyzer's <br/>
+                By continuing, you agree to Taplyzer&apos;s <br />
                 <Link href="#" className="text-primary hover:underline">Terms of Service</Link> and <Link href="#" className="text-primary hover:underline">Privacy Policy</Link>.
               </p>
             </CardFooter>
           </Tabs>
         </Card>
 
-        {/* Auth helper */}
+        {/* Switch tab helper */}
         <div className="text-center">
           <p className="text-xs font-bold text-slate-400 dark:text-white/40 uppercase tracking-widest">
             {activeTab === "signin" ? "Don't have an account?" : "Already have an account?"}{" "}
-            <button 
-              onClick={() => setActiveTab(activeTab === "signin" ? "signup" : "signin")}
-              className="text-primary hover:text-primary/80 transition-colors inline-flex items-center gap-1"
+            <button
+              onClick={() => { setActiveTab(activeTab === "signin" ? "signup" : "signin"); setError(""); setShowPassword(false) }}
+              className="text-primary hover:text-primary/80 transition-colors"
             >
               {activeTab === "signin" ? "Sign Up Now" : "Sign In instead"}
             </button>

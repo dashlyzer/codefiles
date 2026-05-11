@@ -9,6 +9,7 @@ export interface User {
   _id?: string
   name: string
   email: string
+  phone?: string
   role: UserRole
   verified: boolean
 }
@@ -19,8 +20,8 @@ interface AuthContextType {
   isLoading: boolean
   isSuperAdmin: boolean
   isAdmin: boolean
-  signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, name: string, password: string) => Promise<void>
+  signIn: (email: string, password: string, phone: string) => Promise<void>
+  signUp: (email: string, name: string, password: string, phone: string) => Promise<void>
   logOut: () => Promise<void>
 }
 
@@ -32,7 +33,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
-  // Check for session on mount
   useEffect(() => {
     async function checkAuth() {
       try {
@@ -51,13 +51,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuth()
   }, [])
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, phone: string) => {
     setIsLoading(true)
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, phone }),
       })
 
       const data = await res.json()
@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(data.user)
       setIsLoggedIn(true)
-      
+
       if (data.user.role === "SUPER_ADMIN" || data.user.role === "ADMIN") {
         router.push("/admin")
       } else {
@@ -82,13 +82,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const signUp = async (email: string, name: string, password: string) => {
+  const signUp = async (email: string, name: string, password: string, phone: string) => {
     setIsLoading(true)
     try {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name, password }),
+        body: JSON.stringify({ email, name, password, phone }),
       })
 
       const data = await res.json()
@@ -99,7 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(data.user)
       setIsLoggedIn(true)
-      
+
       if (data.user.role === "SUPER_ADMIN") {
         router.push("/admin")
       } else {

@@ -144,3 +144,38 @@ export const DEFAULT_SUGGESTIONS = {
   needs: ["New Clients", "Business Partners", "Industry Connections", "Funding"],
   goals: ["Looking for new business opportunities and networking.", "Seeking strategic partners for expansion."]
 };
+
+// Business Types keyed by Industry
+export const BUSINESS_TYPES_BY_INDUSTRY: Record<string, string[]> = {
+  "SaaS": ["Startup", "Scale-up", "Enterprise Software", "ISV", "Bootstrapped SaaS", "VC-backed"],
+  "AI": ["Research Lab", "AI Startup", "Product Company", "Consulting Firm", "University Spinoff"],
+  "Fintech": ["Neo-bank", "Payment Startup", "Lending Platform", "WealthTech", "InsurTech", "RegTech"],
+  "Healthcare": ["Hospital Chain", "HealthTech Startup", "Clinic Network", "Pharma Company", "MedDevice Maker"],
+  "Manufacturing": ["OEM", "Contract Manufacturer", "SME Factory", "Large Enterprise", "MSME", "Auto-Ancillary"],
+  "Agriculture": ["FPO", "AgriTech Startup", "Farm Cooperative", "Export House", "Input Supplier"],
+  "Logistics": ["3PL Provider", "Freight Forwarder", "Last Mile Company", "Fleet Owner", "Warehouse Operator"],
+  "Real Estate": ["Developer", "PropTech Startup", "REIT", "Broker/Agent", "Investment Firm"],
+  "Construction": ["EPC Contractor", "Sub-contractor", "Architecture Firm", "PMC", "Material Supplier"],
+  "Marketing": ["Digital Agency", "PR Firm", "Media House", "Performance Agency", "Influencer Network"],
+  "HR": ["HR Consultancy", "HRMS Company", "Payroll Provider", "Staffing Agency", "L&D Company"],
+  "Recruitment": ["Executive Search", "RPO Firm", "IT Staffing", "Campus Recruitment", "Headhunter"],
+  "Legal": ["Law Firm", "Solo Practitioner", "LegalTech Startup", "Compliance Firm", "IP Firm"],
+  "Finance": ["CA Firm", "Boutique IB", "Fractional CFO Service", "Tax Consulting", "Audit Firm"],
+  "E-commerce": ["D2C Brand", "Marketplace Seller", "B2B Platform", "Aggregator", "Niche Store"],
+  "D2C": ["Personal Care Brand", "Food & Beverage", "Fashion Brand", "Home Goods", "Subscription Box"],
+  "Retail": ["Chain Store", "Franchise", "Department Store", "Specialty Retailer", "Modern Trade"],
+  "Education": ["EdTech Startup", "Coaching Institute", "K12 School", "University", "Corporate L&D"],
+  "Pharma": ["Generic Manufacturer", "API Producer", "CRO", "Drug Distributor", "Biotech"],
+  "Cybersecurity": ["MSSP", "Product Company", "Consulting Firm", "Govt Contractor", "SOC Provider"],
+  "Consulting": ["Strategy Boutique", "Big4 Affiliate", "Independent Consultant", "Domain Expert Firm"],
+  "Cloud": ["Cloud MSP", "Cloud Reseller", "ISV on Cloud", "DevOps Consultancy", "Multi-cloud Integrator"],
+  "Automotive": ["EV Startup", "Auto-parts Maker", "Dealership Network", "Fleet Company", "Auto Finance"],
+  "Food Processing": ["FMCG Brand", "Private Label Manufacturer", "Bulk Supplier", "Exporter", "Co-packer"],
+  "Export/Import": ["Export House", "Trading Company", "Sourcing Agent", "Customs Broker", "Freight Forwarder"],
+  "Supply Chain": ["SCM Software Company", "3PL", "Procurement Firm", "Supply Chain Consultant", "WMS Provider"],
+};
+
+export const DEFAULT_BUSINESS_TYPES = [
+  "Startup", "SME", "Enterprise", "Freelancer/Solo", "Partnership Firm", "LLP", "Private Limited", "NGO/Trust"
+];
+

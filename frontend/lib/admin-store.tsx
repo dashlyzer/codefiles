@@ -252,9 +252,12 @@ export function AdminStoreProvider({ children }: { children: React.ReactNode }) 
           const usersData = await usersRes.json();
           const bizData = await bizRes.json();
           
+          const usersArray = Array.isArray(usersData) ? usersData : (usersData.users || []);
+          const bizArray = Array.isArray(bizData) ? bizData : (bizData.businesses || []);
+          
           // Map _id to id for frontend compatibility
-          const mappedUsers = usersData.map((u: any) => ({ ...u, id: u._id }));
-          const mappedBiz = bizData.map((b: any) => ({ ...b, id: b._id }));
+          const mappedUsers = usersArray.map((u: any) => ({ ...u, id: u._id }));
+          const mappedBiz = bizArray.map((b: any) => ({ ...b, id: b._id }));
 
           setUsers(mappedUsers);
           setBusinesses(mappedBiz);

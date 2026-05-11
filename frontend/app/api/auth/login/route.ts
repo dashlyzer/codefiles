@@ -11,48 +11,57 @@ export async function POST(req: Request) {
     await dbConnect();
 
     const body = await req.json();
-    const { email, password } = body;
+    const { email, password, phone } = body;
 
-    if (!email || !password) {
-      return NextResponse.json({ error: "Missing email or password" }, { status: 400 });
+    if (!email || !password || !phone) {
+      return NextResponse.json({ error: "Email, password, and phone number are required" }, { status: 400 });
+    }
+
+    // Validate 10 digit phone
+    if (!/^\d{10}$/.test(phone.replace(/\s/g, ""))) {
+      return NextResponse.json({ error: "Phone number must be exactly 10 digits" }, { status: 400 });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
+    const normalizedPhone = phone.replace(/\D/g, "");
 
-    // Find user and explicitly select password
+    // Find user and explicitly select password (hidden by default)
     const user = await User.findOne({ email: normalizedEmail }).select("+password");
 
     if (!user) {
-      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+      return NextResponse.json({ error: "Invalid email, password, or phone number" }, { status: 401 });
     }
 
-    // Check if user has a password set (for legacy accounts)
     if (!user.password) {
       return NextResponse.json({
         error: "This account was created without a password. Please use 'Forgot Password' to set one."
       }, { status: 400 });
     }
 
-    // Check password
+    // Verify password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+      return NextResponse.json({ error: "Invalid email, password, or phone number" }, { status: 401 });
     }
 
-    // Generate JWT
+    // Verify phone matches stored phone
+    if (user.phone !== normalizedPhone) {
+      return NextResponse.json({ error: "Invalid email, password, or phone number" }, { status: 401 });
+    }
+
     const token = jwt.sign(
       { userId: user._id, email: user.email, role: user.role },
       JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    // Return success without password
     const userToReturn = {
       _id: user._id,
       name: user.name,
       email: user.email,
+      phone: user.phone,
       role: user.role,
-      verified: user.verified
+      verified: user.verified,
     };
 
     const response = NextResponse.json(
@@ -60,17 +69,15 @@ export async function POST(req: Request) {
       { status: 200 }
     );
 
-    // Set HTTP-only cookie
     response.cookies.set("taplyzer_auth_token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
+      maxAge: 7 * 24 * 60 * 60,
       path: "/",
     });
 
     return response;
-
   } catch (error: any) {
     console.error("Login error:", error);
     return NextResponse.json({ error: "Internal server error during login" }, { status: 500 });

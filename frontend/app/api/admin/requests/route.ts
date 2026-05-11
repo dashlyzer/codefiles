@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
       { $sort: { total: -1 } },
       { $limit: 5 },
       { $lookup: { from: "users", localField: "_id", foreignField: "_id", as: "user" } },
-      { $unwind: { path: "$user", preserveNullAndEmpty: true } },
+      { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
     ]);
 
     return NextResponse.json({

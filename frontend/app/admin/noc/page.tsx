@@ -62,10 +62,10 @@ export default function AdminNOCPage() {
           Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-12 w-40 rounded-xl bg-slate-100 dark:bg-white/5 animate-pulse" />)
         ) : (
           <>
-            <MetricPill label="Total Matches" value={data?.metrics.totalMatches ?? 0} color="border-blue-200 dark:border-blue-900/30 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/10" />
-            <MetricPill label="Acceptance Rate" value={`${data?.metrics.acceptanceRate ?? 0}%`} color={`border-${(data?.metrics.acceptanceRate ?? 0) >= 40 ? "emerald" : "amber"}-200 dark:border-${(data?.metrics.acceptanceRate ?? 0) >= 40 ? "emerald" : "amber"}-900/30 text-${(data?.metrics.acceptanceRate ?? 0) >= 40 ? "emerald" : "amber"}-700 dark:text-${(data?.metrics.acceptanceRate ?? 0) >= 40 ? "emerald" : "amber"}-400 bg-${(data?.metrics.acceptanceRate ?? 0) >= 40 ? "emerald" : "amber"}-50 dark:bg-${(data?.metrics.acceptanceRate ?? 0) >= 40 ? "emerald" : "amber"}-900/10`} />
-            <MetricPill label="Meeting Conversion" value={`${data?.metrics.meetingConversionRate ?? 0}%`} color="border-purple-200 dark:border-purple-900/30 text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/10" />
-            <MetricPill label="Stuck Deals" value={data?.metrics.stuckDealsCount ?? 0} color="border-red-200 dark:border-red-900/30 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/10" />
+            <MetricPill label="Total Matches" value={data?.metrics?.totalMatches ?? 0} color="border-blue-200 dark:border-blue-900/30 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/10" />
+            <MetricPill label="Acceptance Rate" value={`${data?.metrics?.acceptanceRate ?? 0}%`} color={`border-${(data?.metrics?.acceptanceRate ?? 0) >= 40 ? "emerald" : "amber"}-200 dark:border-${(data?.metrics?.acceptanceRate ?? 0) >= 40 ? "emerald" : "amber"}-900/30 text-${(data?.metrics?.acceptanceRate ?? 0) >= 40 ? "emerald" : "amber"}-700 dark:text-${(data?.metrics?.acceptanceRate ?? 0) >= 40 ? "emerald" : "amber"}-400 bg-${(data?.metrics?.acceptanceRate ?? 0) >= 40 ? "emerald" : "amber"}-50 dark:bg-${(data?.metrics?.acceptanceRate ?? 0) >= 40 ? "emerald" : "amber"}-900/10`} />
+            <MetricPill label="Meeting Conversion" value={`${data?.metrics?.meetingConversionRate ?? 0}%`} color="border-purple-200 dark:border-purple-900/30 text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/10" />
+            <MetricPill label="Stuck Deals" value={data?.metrics?.stuckDealsCount ?? 0} color="border-red-200 dark:border-red-900/30 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/10" />
           </>
         )}
       </div>

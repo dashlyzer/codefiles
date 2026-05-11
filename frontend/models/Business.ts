@@ -8,22 +8,22 @@ import mongoose, { Schema, model, models } from "mongoose";
 const BusinessSchema = new Schema({
   ownerId: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true },
   ownerName: { type: String },
+  ownerDesignation: { type: String, default: "" },
 
   // Step 2: Business Identity
   companyName: { type: String, default: "" },
   brandName: { type: String },
   industry: { type: String, default: "" },
   subIndustry: { type: String },
-  businessType: { 
-    type: String, 
-    enum: ["Startup", "Agency", "SME", "Enterprise", "Freelancer", "Manufacturer", "Distributor", "Consultant", "Service Provider", ""]
-  },
+  businessType: { type: String, default: "" },
 
   // Step 3: Location & Market Reach
   location: {
     country: { type: String },
     state: { type: String },
     city: { type: String },
+    pincode: { type: String },
+    address: { type: String },
     operatesIn: { type: String, enum: ["Local", "National", "Global", ""] }
   },
 
