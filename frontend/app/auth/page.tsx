@@ -3,7 +3,7 @@
 import { useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Zap, Mail, Lock, User, ArrowLeft, Loader2, Phone, Eye, EyeOff } from "lucide-react"
+import { Zap, Mail, Lock, User, ArrowLeft, Loader2, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
@@ -20,7 +20,6 @@ function AuthContent() {
   // Shared fields
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [phone, setPhone] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
 
@@ -29,18 +28,14 @@ function AuthContent() {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email || !password || !phone) {
+    if (!email || !password) {
       setError("Please fill in all fields")
-      return
-    }
-    if (!/^\d{10}$/.test(phone.replace(/\s/g, ""))) {
-      setError("Phone number must be exactly 10 digits")
       return
     }
     setError("")
     setIsLoading(true)
     try {
-      await signIn(email, password, phone.replace(/\D/g, ""))
+      await signIn(email, password)
     } catch (err: any) {
       setError(err.message || "Failed to sign in. Please check your credentials.")
     } finally {
@@ -50,7 +45,7 @@ function AuthContent() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email || !password || !name || !phone) {
+    if (!email || !password || !name) {
       setError("Please fill in all fields")
       return
     }
@@ -59,14 +54,10 @@ function AuthContent() {
       setError("Please enter a valid email address")
       return
     }
-    if (!/^\d{10}$/.test(phone.replace(/\s/g, ""))) {
-      setError("Phone number must be exactly 10 digits")
-      return
-    }
     setError("")
     setIsLoading(true)
     try {
-      await signUp(email, name, password, phone.replace(/\D/g, ""))
+      await signUp(email, name, password)
     } catch (err: any) {
       setError(err.message || "Failed to create account. Please try again.")
     } finally {
@@ -169,22 +160,7 @@ function AuthContent() {
                     </div>
                   </div>
 
-                  {/* Phone */}
-                  <div className="space-y-2">
-                    <label className={labelCls}>Mobile Number (10 digits)</label>
-                    <div className="relative group">
-                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
-                      <Input
-                        type="tel"
-                        placeholder="9876543210"
-                        maxLength={10}
-                        className={inputCls}
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                        required
-                      />
-                    </div>
-                  </div>
+
 
                   {error && <p className="text-[11px] text-red-500 font-bold uppercase tracking-widest text-center animate-in fade-in zoom-in duration-300">{error}</p>}
 
@@ -257,23 +233,7 @@ function AuthContent() {
                     </div>
                   </div>
 
-                  {/* Phone */}
-                  <div className="space-y-2">
-                    <label className={labelCls}>Mobile Number (10 digits)</label>
-                    <div className="relative group">
-                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
-                      <Input
-                        type="tel"
-                        placeholder="9876543210"
-                        maxLength={10}
-                        className={inputCls}
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                        required
-                      />
-                    </div>
-                    <p className="text-[10px] font-bold text-slate-400 dark:text-white/30 ml-1">Used for identity verification on every sign in</p>
-                  </div>
+
 
                   {error && <p className="text-[11px] text-red-500 font-bold uppercase tracking-widest text-center animate-in fade-in zoom-in duration-300">{error}</p>}
 

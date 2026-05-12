@@ -34,7 +34,14 @@ const bottomNavigation = [
 export function Sidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const [isSetupComplete, setIsSetupComplete] = useState(true)
   const { logOut, user } = useAuth()
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsSetupComplete(localStorage.getItem("taplyzer_setup_complete") === "true")
+    }
+  }, [])
 
   return (
     <aside
@@ -70,16 +77,19 @@ export function Sidebar() {
         <nav className="flex-1 px-3 py-4 space-y-1">
           {navigation.map((item) => {
             const isActive = pathname === item.href
+            const isLocked = !isSetupComplete && item.name !== "Profile"
+
             return (
               <Link
                 key={item.name}
-                href={item.href}
+                href={isLocked ? "/profile/setup" : item.href}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                   isActive
                     ? "bg-primary text-white shadow-[0_0_15px_rgba(3,169,244,0.2)]"
                     : "text-slate-500 dark:text-white/40 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white",
-                  collapsed && "justify-center"
+                  collapsed && "justify-center",
+                  isLocked && "opacity-50 cursor-not-allowed"
                 )}
               >
                 <item.icon className="h-5 w-5 shrink-0" />

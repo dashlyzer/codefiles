@@ -20,8 +20,8 @@ interface AuthContextType {
   isLoading: boolean
   isSuperAdmin: boolean
   isAdmin: boolean
-  signIn: (email: string, password: string, phone: string) => Promise<void>
-  signUp: (email: string, name: string, password: string, phone: string) => Promise<void>
+  signIn: (email: string, password: string) => Promise<void>
+  signUp: (email: string, name: string, password: string) => Promise<void>
   logOut: () => Promise<void>
 }
 
@@ -51,13 +51,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuth()
   }, [])
 
-  const signIn = async (email: string, password: string, phone: string) => {
+  const signIn = async (email: string, password: string) => {
     setIsLoading(true)
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, phone }),
+        body: JSON.stringify({ email, password }),
       })
 
       const data = await res.json()
@@ -82,13 +82,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const signUp = async (email: string, name: string, password: string, phone: string) => {
+  const signUp = async (email: string, name: string, password: string) => {
     setIsLoading(true)
     try {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name, password, phone }),
+        body: JSON.stringify({ email, name, password }),
       })
 
       const data = await res.json()

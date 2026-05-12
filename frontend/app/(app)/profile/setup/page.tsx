@@ -3,10 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
-import {
-  Building2, Target, Zap, ArrowRight, ArrowLeft,
-  ShieldCheck, ChevronRight, X, Save, Check
-} from "lucide-react"
+import { Zap, ArrowLeft, ChevronRight, X, Phone, ShieldCheck, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -17,28 +14,24 @@ import {
   BUSINESS_TYPES_BY_INDUSTRY, DEFAULT_BUSINESS_TYPES
 } from "@/constants/industryData"
 
-// Step 1 removed — name/phone already collected at signup
-// New step order: Business → Location → Offerings → Needs → Goal → Verify → Finish
-const STEPS = ["Identity", "Location", "Offerings", "Needs", "Goal", "Verify", "Finish"]
+const STEPS = ["Identity", "Location", "Offerings", "Needs", "Goal"]
 
 type FormData = {
-  role: string
+  companyPhone: string; role: string
   companyName: string; industry: string; customIndustry: string
   businessType: string; customBusinessType: string; teamSize: string
   country: string; state: string; city: string; pincode: string; address: string
   offerings: string[]; needs: string[]
   goal: string; budget: string; timeline: string
-  gstin: string; website: string; linkedin: string
 }
 
 const DEFAULT_FORM: FormData = {
-  role: "",
+  companyPhone: "", role: "",
   companyName: "", industry: "", customIndustry: "",
   businessType: "", customBusinessType: "", teamSize: "1-5",
   country: "India", state: "", city: "", pincode: "", address: "",
   offerings: [], needs: [],
-  goal: "", budget: "", timeline: "",
-  gstin: "", website: "", linkedin: ""
+  goal: "", budget: "", timeline: ""
 }
 
 const inputCls = "h-14 bg-slate-50 dark:bg-white/5 border-none rounded-2xl font-bold"
@@ -48,13 +41,12 @@ const selectCls = "w-full h-14 bg-slate-50 dark:bg-white/5 border border-slate-2
 export default function ProfileSetupPage() {
   const router = useRouter()
   const { user } = useAuth()
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [savedStep, setSavedStep] = useState<number | null>(null)
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<FormData>(DEFAULT_FORM)
   const [tagInput, setTagInput] = useState("")
   const [isInitializing, setIsInitializing] = useState(true)
+  const [showVerifyPopup, setShowVerifyPopup] = useState(false)
 
   const set = (key: keyof FormData, value: any) =>
     setFormData(prev => ({ ...prev, [key]: value }))
@@ -68,26 +60,18 @@ export default function ProfileSetupPage() {
           const data = await res.json()
           if (data?.companyName) {
             setFormData({
+              companyPhone: data.companyPhone || "",
               role: data.ownerDesignation || "",
               companyName: data.companyName || "",
-              industry: data.industry || "",
-              customIndustry: "",
-              businessType: data.businessType || "",
-              customBusinessType: "",
+              industry: data.industry || "", customIndustry: "",
+              businessType: data.businessType || "", customBusinessType: "",
               teamSize: data.strength?.teamSize || "1-5",
               country: data.location?.country || "India",
-              state: data.location?.state || "",
-              city: data.location?.city || "",
-              pincode: data.location?.pincode || "",
-              address: data.location?.address || "",
-              offerings: data.offerings || [],
-              needs: data.needs || [],
+              state: data.location?.state || "", city: data.location?.city || "",
+              pincode: data.location?.pincode || "", address: data.location?.address || "",
+              offerings: data.offerings || [], needs: data.needs || [],
               goal: data.intent?.currentGoal || "",
-              budget: data.intent?.budget || "",
-              timeline: data.intent?.timeline || "",
-              gstin: data.trust?.gst || "",
-              website: data.trust?.website || "",
-              linkedin: data.trust?.linkedin || ""
+              budget: data.intent?.budget || "", timeline: data.intent?.timeline || ""
             })
           }
         }
@@ -98,23 +82,21 @@ export default function ProfileSetupPage() {
   }, [user?._id])
 
   if (isInitializing) {
-    return <div className="min-h-screen bg-slate-50 dark:bg-black flex items-center justify-center"><p className="text-slate-400 font-bold text-sm">Loading profile...</p></div>
+    return <div className="min-h-screen flex items-center justify-center"><p className="text-slate-400 font-bold text-sm">Loading profile...</p></div>
   }
 
   const buildPayload = () => ({
-    ownerId: user?._id,
-    ownerName: user?.name,
+    ownerId: user?._id, ownerName: user?.name,
     ownerDesignation: formData.role,
+    companyPhone: formData.companyPhone,
     companyName: formData.companyName,
     industry: formData.industry === "Other" ? formData.customIndustry : formData.industry,
     businessType: formData.businessType === "Other" ? formData.customBusinessType : formData.businessType,
     location: { country: formData.country, state: formData.state, city: formData.city, pincode: formData.pincode, address: formData.address, operatesIn: "National" },
     strength: { teamSize: formData.teamSize },
-    offerings: formData.offerings,
-    needs: formData.needs,
+    offerings: formData.offerings, needs: formData.needs,
     intent: { currentGoal: formData.goal, budget: formData.budget, timeline: formData.timeline },
-    trust: { website: formData.website, linkedin: formData.linkedin, gst: formData.gstin },
-    isProfileCompleted: currentStep === STEPS.length
+    isProfileCompleted: false
   })
 
   const handleSaveAndNext = async () => {
@@ -124,24 +106,16 @@ export default function ProfileSetupPage() {
       await fetch("/api/business", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildPayload())
+        body: JSON.stringify(currentStep === STEPS.length ? { ...buildPayload(), isProfileCompleted: true } : buildPayload())
       })
-      setCurrentStep(p => Math.min(p + 1, STEPS.length))
+      if (currentStep === STEPS.length) {
+        localStorage.setItem("taplyzer_setup_complete", "true")
+        setShowVerifyPopup(true)
+      } else {
+        setCurrentStep(p => p + 1)
+      }
     } catch (err) { console.error(err) }
     finally { setIsSaving(false) }
-  }
-
-  const handleFinish = async () => {
-    setIsSubmitting(true)
-    try {
-      const res = await fetch("/api/business", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...buildPayload(), isProfileCompleted: true })
-      })
-      if (res.ok) { localStorage.setItem("taplyzer_setup_complete", "true"); router.push("/dashboard") }
-    } catch (err) { console.error(err) }
-    finally { setIsSubmitting(false) }
   }
 
   const addTag = (type: "offerings" | "needs") => {
@@ -152,46 +126,81 @@ export default function ProfileSetupPage() {
   }
   const removeTag = (type: "offerings" | "needs", tag: string) =>
     set(type, formData[type].filter(t => t !== tag))
-
   const toggleTag = (type: "offerings" | "needs", tag: string) => {
-    if (formData[type].includes(tag)) {
-      set(type, formData[type].filter(t => t !== tag))
-    } else {
-      set(type, [...formData[type], tag])
-    }
+    if (formData[type].includes(tag)) removeTag(type, tag)
+    else set(type, [...formData[type], tag])
   }
-
-  const countWords = (str: string) => str.trim().split(/\s+/).filter(w => w.length > 0).length;
+  const countWords = (str: string) => str.trim().split(/\s+/).filter(w => w.length > 0).length
 
   const businessTypeOptions = formData.industry && formData.industry !== "Other"
     ? [...(BUSINESS_TYPES_BY_INDUSTRY[formData.industry] || DEFAULT_BUSINESS_TYPES), "Other"]
     : [...DEFAULT_BUSINESS_TYPES, "Other"]
 
-  const isLastStep = currentStep === STEPS.length
-
   const generateDynamicGoals = () => {
     const suggestions: string[] = []
-    if (formData.needs.length > 0 && formData.city) {
-      suggestions.push(`Seeking ${formData.needs[0]} partners in ${formData.city}.`)
-    }
-    if (formData.offerings.length > 0) {
-      suggestions.push(`Looking to provide ${formData.offerings[0]} services.`)
-    }
-    if (formData.industry) {
-      suggestions.push(`Expanding our ${formData.industry} business network.`)
-    }
-    
-    const industrySuggestions = INDUSTRY_SUGGESTIONS[formData.industry]?.goals || DEFAULT_SUGGESTIONS.goals
-    
-    const combined = [...suggestions, ...industrySuggestions]
-    return Array.from(new Set(combined)).slice(0, 3)
+    if (formData.needs.length > 0 && formData.city) suggestions.push(`Seeking ${formData.needs[0]} partners in ${formData.city}.`)
+    if (formData.offerings.length > 0) suggestions.push(`Looking to provide ${formData.offerings[0]} services.`)
+    if (formData.industry) suggestions.push(`Expanding our ${formData.industry} business network.`)
+    const base = INDUSTRY_SUGGESTIONS[formData.industry]?.goals || DEFAULT_SUGGESTIONS.goals
+    return Array.from(new Set([...suggestions, ...base])).slice(0, 3)
   }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-black flex items-center justify-center p-4 md:p-8">
+
+      {/* Verification Popup */}
+      {showVerifyPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="relative w-full max-w-md bg-white dark:bg-[#0A0A0A] rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden">
+            {/* Chrome-style close button — top-right, always visible */}
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="absolute top-4 right-4 h-8 w-8 rounded-full bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 flex items-center justify-center transition-colors shadow"
+            >
+              <X className="h-3.5 w-3.5 text-red-500" />
+            </button>
+
+            <div className="p-10 pt-14 text-center space-y-6">
+              <div className="mx-auto h-20 w-20 rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center">
+                <ShieldCheck className="h-10 w-10 text-emerald-500" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-black tracking-tighter text-slate-900 dark:text-white">Get Verified for Free</h2>
+                <p className="text-slate-500 font-medium leading-relaxed">
+                  Verified business profiles get <span className="font-black text-emerald-500">80% more deals</span> than unverified ones.
+                  Stand out and attract serious business partners instantly.
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-3 pt-2">
+                {["80% More Deals", "Verified Badge", "Intent Matched"].map(s => (
+                  <div key={s} className="p-3 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/20">
+                    <Check className="h-4 w-4 text-emerald-500 mx-auto mb-1" />
+                    <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">{s}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-3 pt-2">
+                <Button
+                  onClick={() => router.push("/dashboard/verify")}
+                  className="w-full h-14 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase tracking-widest text-[11px] shadow-lg shadow-emerald-500/20 transition-all hover:scale-105"
+                >
+                  Verify My Business Profile — Free <ShieldCheck className="h-4 w-4 ml-2" />
+                </Button>
+                <button
+                  onClick={() => router.push("/dashboard")}
+                  className="w-full text-[10px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-colors"
+                >
+                  Skip for now, go to Dashboard →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-2xl w-full bg-white dark:bg-[#0A0A0A] rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col">
 
-        {/* Progress Bar */}
+        {/* Progress */}
         <div className="p-8 pb-0">
           <div className="flex items-center justify-between mb-4">
             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Step {currentStep} of {STEPS.length}</span>
@@ -200,9 +209,9 @@ export default function ProfileSetupPage() {
           <Progress value={(currentStep / STEPS.length) * 100} className="h-1.5 bg-slate-100 dark:bg-white/5" />
         </div>
 
-        <div className="p-8 md:p-12 flex-grow overflow-y-auto custom-scrollbar max-h-[65vh]">
+        <div className="p-8 md:p-12 flex-grow overflow-y-auto max-h-[65vh]">
 
-          {/* STEP 1: Company Identity (formerly step 2, now includes role/designation) */}
+          {/* STEP 1: Company Identity */}
           {currentStep === 1 && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div>
@@ -210,70 +219,55 @@ export default function ProfileSetupPage() {
                 <p className="text-slate-500 font-medium">Tell us about you and the business you represent.</p>
               </div>
               <div className="space-y-4">
-
                 <div className="space-y-2">
                   <label className={labelCls}>Company Name</label>
                   <Input value={formData.companyName} onChange={e => set("companyName", e.target.value)} placeholder="Acme Softworks" className={inputCls} />
                 </div>
-
                 <div className="space-y-2">
                   <label className={labelCls}>Your Role / Designation</label>
                   <Input value={formData.role} onChange={e => set("role", e.target.value)} placeholder="CEO / Founder / Director" className={inputCls} />
                 </div>
-
+                <div className="space-y-2">
+                  <label className={labelCls}>Company Mobile Number</label>
+                  <div className="relative">
+                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      type="tel" maxLength={10}
+                      value={formData.companyPhone}
+                      onChange={e => set("companyPhone", e.target.value.replace(/\D/g, "").slice(0, 10))}
+                      placeholder="9876543210"
+                      className={`${inputCls} pl-11`}
+                    />
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
-                  {/* Industry dropdown */}
                   <div className="space-y-2">
                     <label className={labelCls}>Industry</label>
-                    <select
-                      value={formData.industry}
-                      onChange={e => { set("industry", e.target.value); set("businessType", ""); set("customIndustry", "") }}
-                      className={selectCls}
-                    >
+                    <select value={formData.industry} onChange={e => { set("industry", e.target.value); set("businessType", ""); set("customIndustry", "") }} className={selectCls}>
                       <option value="" disabled>Select Industry</option>
                       {INDUSTRIES.map(ind => <option key={ind} value={ind}>{ind}</option>)}
                       <option value="Other">Other (specify below)</option>
                     </select>
                     {formData.industry === "Other" && (
-                      <Input
-                        value={formData.customIndustry}
-                        onChange={e => set("customIndustry", e.target.value)}
-                        placeholder="Type your industry"
-                        className={`${inputCls} mt-2`}
-                      />
+                      <Input value={formData.customIndustry} onChange={e => set("customIndustry", e.target.value)} placeholder="Type your industry" className={`${inputCls} mt-2`} />
                     )}
                   </div>
-
-                  {/* Business Type dropdown — options depend on selected industry */}
                   <div className="space-y-2">
                     <label className={labelCls}>Business Type</label>
-                    <select
-                      value={formData.businessType}
-                      onChange={e => { set("businessType", e.target.value); set("customBusinessType", "") }}
-                      className={selectCls}
-                      disabled={!formData.industry}
-                    >
+                    <select value={formData.businessType} onChange={e => { set("businessType", e.target.value); set("customBusinessType", "") }} className={selectCls} disabled={!formData.industry}>
                       <option value="" disabled>{formData.industry ? "Select Type" : "Select Industry first"}</option>
                       {businessTypeOptions.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                     {formData.businessType === "Other" && (
-                      <Input
-                        value={formData.customBusinessType}
-                        onChange={e => set("customBusinessType", e.target.value)}
-                        placeholder="Type your business type"
-                        className={`${inputCls} mt-2`}
-                      />
+                      <Input value={formData.customBusinessType} onChange={e => set("customBusinessType", e.target.value)} placeholder="Type your business type" className={`${inputCls} mt-2`} />
                     )}
                   </div>
                 </div>
-
                 <div className="space-y-2">
                   <label className={labelCls}>Team Size</label>
                   <div className="flex flex-wrap gap-2">
                     {["1-5", "6-20", "21-50", "51-200", "201+"].map(size => (
-                      <button
-                        key={size}
-                        onClick={() => set("teamSize", size)}
+                      <button key={size} onClick={() => set("teamSize", size)}
                         className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${formData.teamSize === size ? "bg-primary text-white shadow-lg shadow-primary/20" : "bg-slate-50 dark:bg-white/5 text-slate-500"}`}
                       >{size}</button>
                     ))}
@@ -333,23 +327,23 @@ export default function ProfileSetupPage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {formData.offerings.map(tag => (
-                    <Badge key={tag} className="bg-primary/10 text-primary border-none px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2">
-                      {tag} <X className="h-3 w-3 cursor-pointer" onClick={() => removeTag("offerings", tag)} />
+                    <Badge key={tag} onClick={() => removeTag("offerings", tag)} className="cursor-pointer bg-primary/10 text-primary border-none px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-primary/20 transition-colors">
+                      {tag} <X className="h-3 w-3" />
                     </Badge>
                   ))}
                 </div>
                 <div className="pt-2">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Suggestions for {formData.industry || "your industry"}:</p>
                   <div className="flex flex-wrap gap-2">
-                    {(INDUSTRY_SUGGESTIONS[formData.industry]?.offerings || DEFAULT_SUGGESTIONS.offerings)
-                      .map(s => {
-                        const isSelected = formData.offerings.includes(s);
-                        return (
+                    {(INDUSTRY_SUGGESTIONS[formData.industry]?.offerings || DEFAULT_SUGGESTIONS.offerings).map(s => {
+                      const isSelected = formData.offerings.includes(s)
+                      return (
                         <Badge key={s} onClick={() => toggleTag("offerings", s)} variant={isSelected ? "default" : "outline"}
                           className={`cursor-pointer px-3 py-1.5 font-bold text-[10px] rounded-lg transition-all ${isSelected ? "bg-primary text-white border-primary shadow-sm shadow-primary/20" : "border-slate-200 dark:border-white/10 text-slate-500 hover:bg-primary/5 hover:text-primary"}`}>
                           {isSelected ? "✓" : "+"} {s}
                         </Badge>
-                      )})}
+                      )
+                    })}
                   </div>
                 </div>
               </div>
@@ -370,44 +364,42 @@ export default function ProfileSetupPage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {formData.needs.map(tag => (
-                    <Badge key={tag} className="bg-emerald-500/10 text-emerald-600 border-none px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2">
-                      {tag} <X className="h-3 w-3 cursor-pointer" onClick={() => removeTag("needs", tag)} />
+                    <Badge key={tag} onClick={() => removeTag("needs", tag)} className="cursor-pointer bg-emerald-500/10 text-emerald-600 border-none px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-emerald-500/20 transition-colors">
+                      {tag} <X className="h-3 w-3" />
                     </Badge>
                   ))}
                 </div>
                 <div className="pt-2">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Suggestions for {formData.industry || "your industry"}:</p>
                   <div className="flex flex-wrap gap-2">
-                    {(INDUSTRY_SUGGESTIONS[formData.industry]?.needs || DEFAULT_SUGGESTIONS.needs)
-                      .map(s => {
-                        const isSelected = formData.needs.includes(s);
-                        return (
+                    {(INDUSTRY_SUGGESTIONS[formData.industry]?.needs || DEFAULT_SUGGESTIONS.needs).map(s => {
+                      const isSelected = formData.needs.includes(s)
+                      return (
                         <Badge key={s} onClick={() => toggleTag("needs", s)} variant={isSelected ? "default" : "outline"}
                           className={`cursor-pointer px-3 py-1.5 font-bold text-[10px] rounded-lg transition-all ${isSelected ? "bg-emerald-500 text-white border-emerald-500 shadow-sm shadow-emerald-500/20" : "border-slate-200 dark:border-white/10 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600"}`}>
                           {isSelected ? "✓" : "+"} {s}
                         </Badge>
-                      )})}
+                      )
+                    })}
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* STEP 5: Goal */}
+          {/* STEP 5: Strategic Goal */}
           {currentStep === 5 && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div>
-                <h2 className="text-3xl font-black italic tracking-tighter text-slate-900 dark:text-white mb-2">Strategic Goal</h2>
-                <p className="text-slate-500 font-medium">What is your most urgent objective on Taplyzer?</p>
+                <h2 className="text-3xl font-black italic tracking-tighter text-slate-900 dark:text-white mb-2">Business Intent</h2>
+                <p className="text-slate-500 font-medium">What is the primary deal or partnership you are actively pursuing?</p>
               </div>
               <div className="space-y-4">
                 <div>
                   <Textarea
                     value={formData.goal}
                     onChange={e => {
-                      if (countWords(e.target.value) <= 60 || e.target.value.length < formData.goal.length) {
-                        set("goal", e.target.value)
-                      }
+                      if (countWords(e.target.value) <= 60 || e.target.value.length < formData.goal.length) set("goal", e.target.value)
                     }}
                     placeholder="e.g. I am looking for a long-term logistics partner..."
                     className="min-h-[120px] bg-slate-50 dark:bg-white/5 border-none rounded-2xl font-bold text-lg p-6 resize-none"
@@ -431,13 +423,9 @@ export default function ProfileSetupPage() {
                     <Input value={formData.budget} onChange={e => set("budget", e.target.value)} placeholder="₹5L – ₹25L" className={inputCls} />
                   </div>
                   <div className="space-y-2">
-                    <label className={labelCls}>Expected Turnaround</label>
-                    <select
-                      value={formData.timeline}
-                      onChange={e => set("timeline", e.target.value)}
-                      className={selectCls}
-                    >
-                      <option value="" disabled>Select turnaround time</option>
+                    <label className={labelCls}>Required By</label>
+                    <select value={formData.timeline} onChange={e => set("timeline", e.target.value)} className={selectCls}>
+                      <option value="" disabled>Select deadline</option>
                       <option value="Less than 7 Days">Less than 7 Days</option>
                       <option value="Within 14 Days">Within 14 Days</option>
                       <option value="Within 30 Days">Within 30 Days</option>
@@ -447,92 +435,18 @@ export default function ProfileSetupPage() {
               </div>
             </div>
           )}
-
-          {/* STEP 6: Verification */}
-          {currentStep === 6 && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div>
-                <h2 className="text-3xl font-black italic tracking-tighter text-slate-900 dark:text-white mb-2">Trust & Verification</h2>
-                <p className="text-slate-500 font-medium">Provide details for business verification and trust.</p>
-              </div>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className={labelCls}>GSTIN / CIN / Business Registration</label>
-                  <Input value={formData.gstin} onChange={e => set("gstin", e.target.value)} placeholder="Optional for now" className={inputCls} />
-                </div>
-                <div className="space-y-2">
-                  <label className={labelCls}>Company Website</label>
-                  <Input value={formData.website} onChange={e => set("website", e.target.value)} placeholder="https://acme.io" className={inputCls} />
-                </div>
-                <div className="space-y-2">
-                  <label className={labelCls}>LinkedIn Profile</label>
-                  <Input value={formData.linkedin} onChange={e => set("linkedin", e.target.value)} placeholder="linkedin.com/company/acme" className={inputCls} />
-                </div>
-                <div className="p-6 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-200 dark:border-amber-900/30 flex items-start gap-4">
-                  <ShieldCheck className="h-6 w-6 text-amber-600 mt-1" />
-                  <p className="text-xs font-bold text-amber-700 dark:text-amber-500 leading-relaxed">
-                    Verified profiles get 3x more introductions. You can provide these details now or later.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 7: Finish */}
-          {currentStep === 7 && (
-            <div className="py-12 flex flex-col items-center text-center space-y-8 animate-in zoom-in-95 duration-700">
-              <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center relative">
-                <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin duration-[2s]" />
-                <Zap className="h-12 w-12 text-primary fill-primary" />
-              </div>
-              <div className="space-y-3">
-                <h2 className="text-4xl font-black italic tracking-tighter text-slate-900 dark:text-white">Profile Ready!</h2>
-                <p className="text-slate-500 font-bold max-w-md">Your strategic profile is optimized. Taplyzer AI is scanning for the best business matches.</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4 w-full pt-8">
-                <div className="p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-100 dark:border-white/10">
-                  <span className="text-3xl font-black text-primary italic">12</span>
-                  <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mt-2">Potential Matches</span>
-                </div>
-                <div className="p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-100 dark:border-white/10">
-                  <span className="text-3xl font-black text-emerald-500 italic">94%</span>
-                  <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mt-2">Profile Score</span>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Footer Navigation */}
+        {/* Footer */}
         <div className="p-6 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02] flex items-center justify-between gap-4">
-          <Button
-            variant="ghost"
-            onClick={() => setCurrentStep(p => Math.max(p - 1, 1))}
-            disabled={currentStep === 1}
-            className="h-12 px-5 rounded-xl font-black uppercase tracking-widest text-[10px] text-slate-400 hover:text-slate-900 disabled:opacity-0"
-          >
+          <Button variant="ghost" onClick={() => setCurrentStep(p => Math.max(p - 1, 1))} disabled={currentStep === 1}
+            className="h-12 px-5 rounded-xl font-black uppercase tracking-widest text-[10px] text-slate-400 hover:text-slate-900 disabled:opacity-0">
             <ArrowLeft className="h-4 w-4 mr-2" /> Back
           </Button>
-
-          <div className="flex items-center gap-3">
-            {isLastStep ? (
-              <Button
-                onClick={handleFinish}
-                disabled={isSubmitting}
-                className="h-14 px-12 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-black font-black uppercase tracking-widest text-[11px] shadow-xl flex items-center gap-3 transition-all hover:scale-105 active:scale-95"
-              >
-                {isSubmitting ? "Saving..." : "Go to Dashboard"} <Zap className="h-4 w-4 fill-current" />
-              </Button>
-            ) : (
-              <Button
-                onClick={handleSaveAndNext}
-                disabled={isSaving}
-                className="h-14 px-10 rounded-2xl bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest text-[11px] shadow-xl shadow-primary/20 flex items-center gap-3 transition-all hover:scale-105 active:scale-95"
-              >
-                {isSaving ? "Saving..." : "Save & Next"} <ChevronRight className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+          <Button onClick={handleSaveAndNext} disabled={isSaving}
+            className="h-14 px-10 rounded-2xl bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest text-[11px] shadow-xl shadow-primary/20 flex items-center gap-3 transition-all hover:scale-105 active:scale-95">
+            {isSaving ? "Saving..." : currentStep === STEPS.length ? "Complete Profile" : "Save & Next"} <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
       </div>
     </div>

@@ -11,25 +11,19 @@ export async function POST(req: Request) {
     await dbConnect();
 
     const body = await req.json();
-    const { email, password, phone } = body;
+    const { email, password } = body;
 
-    if (!email || !password || !phone) {
-      return NextResponse.json({ error: "Email, password, and phone number are required" }, { status: 400 });
-    }
-
-    // Validate 10 digit phone
-    if (!/^\d{10}$/.test(phone.replace(/\s/g, ""))) {
-      return NextResponse.json({ error: "Phone number must be exactly 10 digits" }, { status: 400 });
+    if (!email || !password) {
+      return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-    const normalizedPhone = phone.replace(/\D/g, "");
 
     // Find user and explicitly select password (hidden by default)
     const user = await User.findOne({ email: normalizedEmail }).select("+password");
 
     if (!user) {
-      return NextResponse.json({ error: "Invalid email, password, or phone number" }, { status: 401 });
+      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
     if (!user.password) {
@@ -41,12 +35,7 @@ export async function POST(req: Request) {
     // Verify password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return NextResponse.json({ error: "Invalid email, password, or phone number" }, { status: 401 });
-    }
-
-    // Verify phone matches stored phone
-    if (user.phone !== normalizedPhone) {
-      return NextResponse.json({ error: "Invalid email, password, or phone number" }, { status: 401 });
+      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
     const token = jwt.sign(

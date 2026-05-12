@@ -44,7 +44,7 @@ export default function ProfilePage() {
    const [isEditOfferingsOpen, setIsEditOfferingsOpen] = useState(false)
    const [isEditNeedsOpen, setIsEditNeedsOpen] = useState(false)
    const [isEditGoalOpen, setIsEditGoalOpen] = useState(false)
-   const [isVerificationOpen, setIsVerificationOpen] = useState(false)
+
 
    const [profileData, setProfileData] = useState<any>({
       // Business Info
@@ -207,7 +207,7 @@ export default function ProfilePage() {
                      <div className="flex gap-3">
                         <Button onClick={() => router.push("/profile/setup")} variant="outline" className="font-black uppercase tracking-widest text-[10px] h-10 px-6 rounded-xl border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 shadow-sm"><Edit3 className="h-3 w-3 mr-2" /> Edit Profile</Button>
                         {profileData.verificationStatus !== "Approved" && profileData.verificationStatus !== "Under Review" && (
-                           <Button onClick={() => setIsVerificationOpen(true)} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-black font-black uppercase tracking-widest text-[10px] h-10 px-6 rounded-xl shadow-lg shadow-black/10 dark:shadow-white/10"><ShieldCheck className="h-3 w-3 mr-2" /> Get Verified</Button>
+                           <Button onClick={() => router.push("/dashboard/verify")} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-black font-black uppercase tracking-widest text-[10px] h-10 px-6 rounded-xl shadow-lg shadow-black/10 dark:shadow-white/10"><ShieldCheck className="h-3 w-3 mr-2" /> Get Verified</Button>
                         )}
                      </div>
                   </div>
@@ -252,7 +252,7 @@ export default function ProfilePage() {
          <div className="bg-white dark:bg-[#0A0A0A] rounded-[2rem] border border-slate-200 dark:border-white/10 p-6 md:p-10 shadow-sm">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
                <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2"><Shield className="h-5 w-5 text-emerald-500" /> Business Trust Status</h2>
-               {profileData.verificationStatus !== "Approved" && <Button onClick={() => setIsVerificationOpen(true)} variant="outline" className="font-black uppercase tracking-widest text-[10px] h-10 px-6 rounded-xl border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5">Improve Profile Trust</Button>}
+               {profileData.verificationStatus !== "Approved" && <Button onClick={() => router.push("/dashboard/verify")} variant="outline" className="font-black uppercase tracking-widest text-[10px] h-10 px-6 rounded-xl border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5">Improve Profile Trust</Button>}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
@@ -346,14 +346,7 @@ export default function ProfilePage() {
             />
          )}
 
-         {/* VERIFICATION WIZARD MODAL */}
-         {isVerificationOpen && (
-            <VerificationWizardModal
-               profileData={profileData}
-               onClose={() => setIsVerificationOpen(false)}
-               onComplete={(d: Record<string, unknown>) => { updateData(d); setIsVerificationOpen(false); toast.success("Verification submitted!") }}
-            />
-         )}
+
 
          {/* EDIT PROFILE MODAL (Strictly Business Info & Settings) */}
          {isEditProfileOpen && (
@@ -593,134 +586,4 @@ function EditProfileModal({ data, onClose, onSave }: any) {
 }
 
 
-function VerificationWizardModal({ profileData, onClose, onComplete }: any) {
-   const [step, setStep] = useState(1)
-   const [loading, setLoading] = useState(false)
-   const [otp, setOtp] = useState("")
-   const [email, setEmail] = useState("")
 
-   const handleSimulate = async (nextStep: number | 'complete') => {
-      setLoading(true)
-      await new Promise(r => setTimeout(r, 1200)) // network simulation
-      setLoading(false)
-      if (nextStep === 'complete') {
-         onComplete({ mobileVerified: true, emailVerified: true, verificationStatus: "Under Review" })
-      } else {
-         setStep(nextStep)
-      }
-   }
-
-   return (
-      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-         <div className="bg-white dark:bg-[#0A0A0A] rounded-[2rem] w-full max-w-lg border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col">
-
-            <div className="p-6 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/[0.02] relative overflow-hidden">
-               <ShieldCheck className="absolute -right-4 -bottom-4 h-32 w-32 text-slate-200 dark:text-white/5 pointer-events-none" />
-               <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-4">
-                     <h3 className="text-xl font-black text-slate-900 dark:text-white">Verification Flow</h3>
-                     <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full h-8 w-8 -mr-2"><X className="h-4 w-4" /></Button>
-                  </div>
-                  <div className="flex gap-2">
-                     {[1, 2, 3, 4, 5].map(s => (
-                        <div key={s} className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${s === step ? 'bg-slate-900 dark:bg-white' : s < step ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-white/10'}`}></div>
-                     ))}
-                  </div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-3">Step {step} of 5</p>
-               </div>
-            </div>
-
-            <div className="p-6 md:p-8 space-y-6 relative min-h-[320px]">
-               {step === 1 && (
-                  <div className="animate-in slide-in-from-right-4 duration-300">
-                     <div className="h-12 w-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-blue-500 flex items-center justify-center mb-6"><Smartphone className="h-6 w-6" /></div>
-                     <h4 className="text-lg font-black text-slate-900 dark:text-white mb-2">Mobile OTP Verification</h4>
-                     <p className="text-sm font-bold text-slate-500 mb-6">Enter your mobile number to receive a one-time password.</p>
-                     <div className="space-y-4">
-                        <Input placeholder="Mobile Number" className="h-12 bg-slate-50 dark:bg-white/5 font-bold rounded-xl" />
-                        <div className="flex gap-2">
-                           <Input value={otp} onChange={e => setOtp(e.target.value)} placeholder="Enter OTP" className="h-12 bg-slate-50 dark:bg-white/5 font-bold rounded-xl" />
-                           <Button onClick={() => handleSimulate(2)} disabled={loading || otp.length < 4} className="h-12 bg-slate-900 text-white dark:bg-white dark:text-black px-6 font-black rounded-xl w-32 shrink-0">
-                              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify OTP"}
-                           </Button>
-                        </div>
-                     </div>
-                  </div>
-               )}
-
-               {step === 2 && (
-                  <div className="animate-in slide-in-from-right-4 duration-300">
-                     <div className="h-12 w-12 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500 flex items-center justify-center mb-6"><Mail className="h-6 w-6" /></div>
-                     <h4 className="text-lg font-black text-slate-900 dark:text-white mb-2">Business Email Verification</h4>
-                     <p className="text-sm font-bold text-slate-500 mb-6">We will send a verification link to your work email (name@company.com).</p>
-                     <div className="space-y-4">
-                        <Input value={email} onChange={e => setEmail(e.target.value)} placeholder="name@company.com" className="h-12 bg-slate-50 dark:bg-white/5 font-bold rounded-xl" />
-                        <div className="flex gap-2">
-                           <Button onClick={() => handleSimulate(3)} disabled={loading || !email.includes('@')} className="h-12 flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl">
-                              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send Link"}
-                           </Button>
-                           <Button variant="outline" className="h-12 px-6 rounded-xl font-black text-xs uppercase tracking-widest border-slate-200">Resend</Button>
-                        </div>
-                     </div>
-                  </div>
-               )}
-
-               {step === 3 && (
-                  <div className="animate-in slide-in-from-right-4 duration-300">
-                     <div className="h-12 w-12 rounded-2xl bg-amber-50 dark:bg-amber-900/20 text-amber-500 flex items-center justify-center mb-6"><Building2 className="h-6 w-6" /></div>
-                     <h4 className="text-lg font-black text-slate-900 dark:text-white mb-2">Business Authenticity Details</h4>
-                     <p className="text-sm font-bold text-slate-500 mb-6">Provide clear business signals to pass our manual review.</p>
-                     <div className="space-y-4">
-                        <Input defaultValue={profileData.companyName} className="h-12 bg-slate-50 dark:bg-white/5 font-bold rounded-xl" placeholder="Company Name" />
-                        <Input defaultValue={profileData.website} className="h-12 bg-slate-50 dark:bg-white/5 font-bold rounded-xl" placeholder="Website URL (optional)" />
-                        <Input className="h-12 bg-slate-50 dark:bg-white/5 font-bold rounded-xl" placeholder="LinkedIn Company Page (optional)" />
-                        <Input className="h-12 bg-slate-50 dark:bg-white/5 font-bold rounded-xl" placeholder="GSTIN / CIN / Registration ID (optional)" />
-                        <Button onClick={() => handleSimulate(4)} disabled={loading} className="h-12 w-full bg-slate-900 text-white dark:bg-white dark:text-black font-black rounded-xl mt-2">
-                           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Next"}
-                        </Button>
-                     </div>
-                  </div>
-               )}
-
-               {step === 4 && (
-                  <div className="animate-in slide-in-from-right-4 duration-300">
-                     <div className="h-12 w-12 rounded-2xl bg-purple-50 dark:bg-purple-900/20 text-purple-500 flex items-center justify-center mb-6"><Activity className="h-6 w-6" /></div>
-                     <h4 className="text-lg font-black text-slate-900 dark:text-white mb-2">Business Readiness</h4>
-                     <p className="text-sm font-bold text-slate-500 mb-6">Confirm your deal readiness parameters.</p>
-                     <div className="space-y-4">
-                        <div>
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 block">What do you offer?</label>
-                           <Input disabled value={profileData.offerings.join(', ')} className="h-12 bg-slate-100 dark:bg-white/5 font-bold rounded-xl text-slate-500" />
-                        </div>
-                        <div>
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 block">What deals are you seeking?</label>
-                           <Input disabled value={profileData.needs.join(', ')} className="h-12 bg-slate-100 dark:bg-white/5 font-bold rounded-xl text-slate-500" />
-                        </div>
-                        <div>
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 block">Preferred industries</label>
-                           <Input className="h-12 bg-slate-50 dark:bg-white/5 font-bold rounded-xl" placeholder="e.g. Finance, Healthcare" />
-                        </div>
-                        <Button onClick={() => handleSimulate(5)} disabled={loading} className="h-12 w-full bg-slate-900 text-white dark:bg-white dark:text-black font-black rounded-xl mt-2">
-                           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit for Review"}
-                        </Button>
-                     </div>
-                  </div>
-               )}
-
-               {step === 5 && (
-                  <div className="animate-in zoom-in-95 duration-500 flex flex-col items-center text-center py-6 h-full justify-center">
-                     <div className="h-20 w-20 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-6 shadow-xl shadow-blue-500/20">
-                        <Activity className="h-10 w-10 text-blue-600 dark:text-blue-400 stroke-[3]" />
-                     </div>
-                     <h4 className="text-2xl font-black text-slate-900 dark:text-white mb-3">Under Review</h4>
-                     <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-2xl p-4 mb-6">
-                        <p className="text-sm font-bold text-amber-800 dark:text-amber-400 text-left flex gap-2 items-start"><AlertCircle className="h-5 w-5 shrink-0" /> Your business verification is under manual review. Taplyzer team will verify your company website, LinkedIn presence, and business authenticity before approval.</p>
-                     </div>
-                     <Button onClick={() => handleSimulate('complete')} className="h-12 w-full bg-slate-900 text-white dark:bg-white dark:text-black font-black uppercase tracking-widest text-[10px] rounded-xl">Return to Profile</Button>
-                  </div>
-               )}
-            </div>
-         </div>
-      </div>
-   )
-}

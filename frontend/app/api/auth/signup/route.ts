@@ -11,7 +11,6 @@ const signupSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email format").toLowerCase(),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  phone: z.string().regex(/^\d{10}$/, "Phone number must be exactly 10 digits"),
 });
 
 export async function POST(req: Request) {
@@ -25,16 +24,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
     }
 
-    const { name, email, password, phone } = validation.data;
+    const { name, email, password } = validation.data;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return NextResponse.json({ error: "User with this email already exists" }, { status: 409 });
-    }
-
-    const existingPhone = await User.findOne({ phone });
-    if (existingPhone) {
-      return NextResponse.json({ error: "This phone number is already registered" }, { status: 409 });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -44,7 +38,6 @@ export async function POST(req: Request) {
       name,
       email: email.toLowerCase(),
       password: hashedPassword,
-      phone,
       role: email.toLowerCase() === "admin@taplyzer.com" ? "SUPER_ADMIN" : "USER",
     });
 

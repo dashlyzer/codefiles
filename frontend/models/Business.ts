@@ -10,7 +10,8 @@ const BusinessSchema = new Schema({
   ownerName: { type: String },
   ownerDesignation: { type: String, default: "" },
 
-  // Step 2: Business Identity
+  // Step 1: Business Identity
+  companyPhone: { type: String, default: "" },
   companyName: { type: String, default: "" },
   brandName: { type: String },
   industry: { type: String, default: "" },
