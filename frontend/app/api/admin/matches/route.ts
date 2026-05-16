@@ -28,18 +28,28 @@ export async function GET(req: NextRequest) {
     ]);
 
     // Aggregate stats
-    const [avgScoreResult, outcomeCounts] = await Promise.all([
+    const [avgScoreResult, outcomeCounts, scoreBuckets] = await Promise.all([
       MatchRecord.aggregate([{ $group: { _id: null, avg: { $avg: "$score" } } }]),
       MatchRecord.aggregate([
         { $group: { _id: "$outcome", count: { $sum: 1 } } },
       ]),
+      MatchRecord.aggregate([
+        {
+          $bucket: {
+            groupBy: "$score",
+            boundaries: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 101],
+            default: "Other",
+            output: { count: { $sum: 1 } }
+          }
+        }
+      ])
     ]);
 
     const avgScore = avgScoreResult[0]?.avg ? Math.round(avgScoreResult[0].avg) : 0;
 
     const outcomeMap: Record<string, number> = {};
     for (const o of outcomeCounts) {
-      outcomeMap[o._id || "NoOutcome"] = o.count;
+      outcomeMap[o._id || "pending"] = o.count;
     }
 
     return NextResponse.json({
@@ -47,7 +57,13 @@ export async function GET(req: NextRequest) {
       total,
       page,
       pages: Math.ceil(total / limit),
-      stats: { avgScore, outcomeCounts: outcomeMap },
+      stats: { 
+        total,
+        avgScore, 
+        meetingScheduled: outcomeMap["Meeting"] || 0,
+        ignored: outcomeMap["Ignored"] || 0,
+        scoreBuckets 
+      },
     });
   } catch (err: any) {
     console.error("Admin matches error:", err);

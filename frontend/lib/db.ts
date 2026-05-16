@@ -1,6 +1,11 @@
 import mongoose from "mongoose";
 
-const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://Tapadmin:tap123@cluster0.i0sga0f.mongodb.net/?appName=Cluster0";
+// Database connection configuration
+
+
+const MONGO_URI = process.env.MONGO_URI;
+
+
 
 if (!MONGO_URI) {
   throw new Error("Please define the MONGO_URI environment variable inside .env.local");
@@ -27,13 +32,6 @@ async function dbConnect() {
       bufferCommands: false,
     };
 
-    // Apply the DNS fix if needed (Next.js environment)
-    try {
-      const dns = require("node:dns");
-      dns.setServers(["1.1.1.1", "8.8.8.8"]);
-    } catch (e) {
-      console.warn("DNS override failed, using default system DNS");
-    }
 
     cached.promise = mongoose.connect(MONGO_URI, opts).then((mongoose) => {
       return mongoose;
