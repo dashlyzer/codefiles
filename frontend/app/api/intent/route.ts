@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import dbConnect from "@/lib/db";
 import Intent from "@/models/Intent";
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 async function generateEmbedding(text: string) {
-  const res = await client.embeddings.create({
-    model: "text-embedding-3-small",
-    input: text,
-  });
-  return res.data[0].embedding;
+  const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
+  const result = await model.embedContent(text);
+  return result.embedding.values;
 }
+
+
 
 export async function POST(req: Request) {
   try {

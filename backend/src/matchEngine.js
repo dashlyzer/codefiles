@@ -1,19 +1,21 @@
 // ===============================
 // TAPLYZER MATCH ENGINE
-// Node.js + MongoDB + OpenAI Embeddings
+// Node.js + MongoDB + Google Gemini Embeddings
 // ===============================
-// npm install express mongoose dotenv openai
+// npm install express mongoose dotenv @google/generative-ai
 // ===============================
+
 
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
-const OpenAI = require("openai");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const app = express();
 app.use(express.json());
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
 
 // ===============================
 // MONGODB CONNECTION
@@ -64,12 +66,12 @@ const Match = mongoose.model("Match", matchSchema);
 // EMBEDDING FUNCTION
 // ===============================
 async function generateEmbedding(text) {
-  const res = await client.embeddings.create({
-    model: "text-embedding-3-small",
-    input: text,
-  });
-  return res.data[0].embedding;
+  const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
+  const result = await model.embedContent(text);
+  return result.embedding.values;
 }
+
+
 
 // ===============================
 // COSINE SIMILARITY
