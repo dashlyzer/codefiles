@@ -53,7 +53,7 @@ export async function POST(
       );
     }
 
-    // 2. Fetch active candidate businesses (limit to top 60 for LLM prompt context)
+    // 2. Fetch active candidate businesses (limit to top 30 for fast, high-quality LLM evaluation)
     const candidates: any[] = await Business.aggregate([
       { $match: { ownerId: { $ne: new mongoose.Types.ObjectId(userId) } } },
       {
@@ -66,7 +66,7 @@ export async function POST(
       },
       { $unwind: { path: "$ownerData", preserveNullAndEmptyArrays: true } },
       { $match: { "ownerData.status": { $ne: "SUSPENDED" } } },
-      { $limit: 60 }
+      { $limit: 30 }
     ]);
 
     if (candidates.length === 0) {
@@ -93,25 +93,22 @@ export async function POST(
       }))
     };
 
-    const systemInstruction = `You are an expert B2B matchmaker and AI judge. Your job is to evaluate the exact commercial synergy between a 'targetBusiness' and a list of 'candidates'.
+    const systemInstruction = `You are an expert B2B matchmaker and AI judge. Your job is to evaluate the commercial synergy between a 'targetBusiness' and a list of 'candidates'.
 
 Evaluate bidirectional synergy:
 1. Does the targetBusiness need what the candidate offers? (Target is Buyer)
 2. Does the candidate need what the targetBusiness offers? (Target is Seller)
 
+CRITICAL INSTRUCTION: To save bandwidth, ONLY return candidates that have genuine commercial synergy (aiScore >= 10). Do NOT include candidates with 0 synergy or direct competitors.
+
 Return a JSON array of objects with this exact structure:
 [
   {
     "candidateId": "string (must match candidate id precisely)",
-    "aiScore": number (0 to 80, where 80 is a perfect commercial match, 40 is moderate, 0 is no synergy),
-    "aiReason": "string (1 clear, compelling sentence explaining exactly why they match or why there is synergy)"
+    "aiScore": number (10 to 80, where 80 is a perfect commercial match, 40 is moderate synergy),
+    "aiReason": "string (1 clear, compelling sentence explaining exactly why they match or what the synergy is)"
   }
-]
-
-CRITICAL RULES:
-- Ignore generic labels like 'B2B', 'SaaS', 'startup', or 'clients' when scoring. Look at the actual underlying products, services, and industry alignment.
-- If they are direct competitors offering the exact same thing without complementary needs, assign aiScore: 0.
-- Ensure every candidate from the input has an entry in the output array.`;
+]`;
 
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
@@ -130,18 +127,31 @@ CRITICAL RULES:
     
     console.log(`[MATCH] Gemini response received in ${Date.now() - startTime}ms`);
 
-    let aiEvaluations: { candidateId: string; aiScore: number; aiReason: string }[] = [];
+    let aiEvaluations: any[] = [];
     try {
       aiEvaluations = JSON.parse(responseText);
     } catch (parseErr) {
-      console.error("[MATCH] Failed to parse Gemini JSON output:", responseText);
-      return NextResponse.json({ msg: "AI Parsing Error" }, { status: 500 });
+      console.warn("[MATCH] Standard JSON parse failed, attempting regex extraction on partial JSON...");
+      // Fallback: extract all valid object blocks from partial JSON
+      const matches = responseText.match(/{\s*"candidateId"[^}]+}/g);
+      if (matches) {
+        aiEvaluations = matches.map(m => {
+          try { return JSON.parse(m); } catch (e) { return null; }
+        }).filter(Boolean);
+      }
+      if (aiEvaluations.length === 0) {
+        console.error("[MATCH] Fatal AI Parsing Error. Raw output:", responseText);
+        return NextResponse.json({ msg: "AI Parsing Error", raw: responseText }, { status: 500 });
+      }
     }
 
-    // Map AI evaluations by candidateId for fast merging
+    // Map AI evaluations by candidateId for fast merging (support flexible ID keys from LLM)
     const evalMap = new Map<string, { aiScore: number; aiReason: string }>();
     for (const item of aiEvaluations) {
-      evalMap.set(item.candidateId, { aiScore: Number(item.aiScore) || 0, aiReason: item.aiReason || "" });
+      const id = item?.candidateId || item?.id || item?.candidateID || item?.ID;
+      if (id) {
+        evalMap.set(id.toString(), { aiScore: Number(item.aiScore) || 0, aiReason: item.aiReason || "" });
+      }
     }
 
     // 4. Merge AI scores with Location scores and format final results
