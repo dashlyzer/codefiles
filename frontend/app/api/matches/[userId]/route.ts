@@ -1,133 +1,89 @@
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import dbConnect from "@/lib/db";
-import User from "@/models/User";
 import Business from "@/models/Business";
+import Offering from "@/models/Offering";
 import MatchRecord from "@/models/MatchRecord";
-import Rating from "@/models/Rating";
 import { tokenize, bm25Score, normalizeBM25 } from "@/lib/bm25";
 
 export const dynamic = "force-dynamic";
 
-// ─── Scoring constants ────────────────────────────────────────────────────────
-const MAX_INTENT = 50;
-const MAX_LOCATION = 15;
-const MAX_VERIFICATION = 15;
-const MAX_REPUTATION = 10;
-const MAX_PROFILE = 5;
-const MAX_PLAN = 5;
-// Total max = 100
+// ─── Gemini client ────────────────────────────────────────────────────────────
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Scoring weights (max = 100) ──────────────────────────────────────────────
+// Rule: User A's NEEDS → User B's OFFERINGS
+const MAX_SEMANTIC = 70; // cosine similarity (Gemini embeddings)
+const MAX_BM25     = 10; // keyword overlap tie-breaker
+const MAX_LOCATION = 20; // geo proximity
 
-function verificationScore(status: string | undefined): number {
-  switch (status) {
-    case "Trusted Partner": return 20;
-    case "Business Verified": return 16;
-    case "Basic Verified": return 10;
-    default: return 0;
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Generate a Gemini embedding vector for a text string */
+async function generateEmbedding(text: string): Promise<number[]> {
+  const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
+  const result = await model.embedContent(text);
+  return result.embedding.values;
+}
+
+/** Cosine similarity between two equal-length vectors (returns 0–1) */
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length || a.length === 0) return 0;
+  let dot = 0, magA = 0, magB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot  += a[i] * b[i];
+    magA += a[i] * a[i];
+    magB += b[i] * b[i];
   }
+  const denom = Math.sqrt(magA) * Math.sqrt(magB);
+  return denom === 0 ? 0 : dot / denom;
 }
 
-function locationScore(
-  userBiz: any,
-  candidateBiz: any
-): number {
-  // Geo proximity (compare normalised lowercase strings)
-  const normalise = (s?: string) => (s || "").toLowerCase().trim();
+/** Location proximity score (0–20) */
+function locationScore(userBiz: any, c: any): number {
+  const norm = (s?: string) => (s || "").toLowerCase().trim();
+  const uCity    = norm(userBiz.location?.city);
+  const uState   = norm(userBiz.location?.state);
+  const uCountry = norm(userBiz.location?.country);
+  const cCity    = norm(c.location?.city);
+  const cState   = norm(c.location?.state);
+  const cCountry = norm(c.location?.country);
 
-  const userCity = normalise(userBiz.location?.city);
-  const userState = normalise(userBiz.location?.state);
-  const userCountry = normalise(userBiz.location?.country);
+  if (uCity    && cCity    && uCity    === cCity)    return 20; // same city
+  if (uState   && cState   && uState   === cState)   return 12; // same state
+  if (uCountry && cCountry && uCountry === cCountry) return 6;  // same country
 
-  const cCity = normalise(candidateBiz.location?.city);
-  const cState = normalise(candidateBiz.location?.state);
-  const cCountry = normalise(candidateBiz.location?.country);
-
-  let geoScore = 0;
-  if (userCity && cCity && userCity === cCity) {
-    geoScore = 20; // Same city — best geo match
-  } else if (userState && cState && userState === cState) {
-    geoScore = 12; // Same state
-  } else if (userCountry && cCountry && userCountry === cCountry) {
-    geoScore = 6;  // Same country
-  }
-
-  // Reach bonus — businesses that operate beyond their city
-  const operatesIn = (candidateBiz.location?.operatesIn || "").toLowerCase();
-  let reachScore = 0;
-  if (operatesIn === "global") reachScore = 10;
-  if (operatesIn === "national") reachScore = 8;
-
-  // Take the higher of geo match or reach score
-  return Math.min(Math.max(geoScore, reachScore), MAX_LOCATION);
+  // Reach bonus for globally / nationally operating businesses
+  const reach = (c.location?.operatesIn || "").toLowerCase();
+  if (reach === "global")   return 15;
+  if (reach === "national") return 10;
+  return 0;
 }
 
-function reputationScore(avgRating: number | null): number {
-  if (avgRating === null) return 5; // Neutral for no ratings yet
-  if (avgRating >= 4.5) return 10;
-  if (avgRating >= 4.0) return 8;
-  if (avgRating >= 3.0) return 5;
-  return 2;
-}
-
-function profileScore(score: number | undefined): number {
-  const s = score ?? 0;
-  if (s >= 80) return 5;
-  if (s >= 60) return 3;
-  return 1;
-}
-
-function subscriptionScore(plan: string | undefined): number {
-  switch (plan) {
-    case "ENTERPRISE": return 5;
-    case "PRO": return 3;
-    default: return 0;
-  }
-}
-
+/** Human-readable match reasons */
 function buildReasons(
-  breakdown: Record<string, number>,
-  candidateBiz: any,
-  candidateUser: any,
-  avgRating: number | null,
-  userNeeds: string[],
-  userOfferings: string[],
+  semanticPts: number,
+  bm25Pts: number,
+  locationPts: number,
+  c: any
 ): string[] {
   const reasons: string[] = [];
-
-  // Intent relevance
-  if (breakdown.intentRelevance > 0) {
-    const theyOffer = (candidateBiz.offerings || []).slice(0, 3).join(", ");
-    const theyNeed = (candidateBiz.needs || []).slice(0, 3).join(", ");
+  if (semanticPts > 0) {
+    const theyNeed = (c.needs    || []).slice(0, 2).join(", ");
+    const theyOffer= (c.offerings|| []).slice(0, 3).join(", ");
     if (theyOffer) reasons.push(`They offer: ${theyOffer}`);
-    if (theyNeed) reasons.push(`They need: ${theyNeed}`);
+    if (theyNeed)  reasons.push(`They need: ${theyNeed}`);
   }
-
-  // Location
-  if (breakdown.location >= 20) {
-    reasons.push(`📍 Same city — ${candidateBiz.location?.city}`);
-  } else if (breakdown.location >= 12) {
-    reasons.push(`📍 Same state — ${candidateBiz.location?.state}`);
-  } else if (breakdown.location >= 10) {
-    reasons.push(`🌍 Operates ${candidateBiz.location?.operatesIn}`);
-  } else if (breakdown.location >= 6) {
-    reasons.push(`📍 Same country — ${candidateBiz.location?.country}`);
-  }
-
-  // Verification
-  const vs = candidateBiz.trust?.verificationStatus;
-  if (vs && vs !== "Not Verified") reasons.push(`✅ ${vs}`);
-
-  // Reputation
-  if (avgRating !== null) {
-    reasons.push(`⭐ ${avgRating.toFixed(1)} avg rating`);
-  }
-
+  if (bm25Pts > 5) reasons.push("🔑 Strong keyword match");
+  if (locationPts >= 20)      reasons.push(`📍 Same city — ${c.location?.city}`);
+  else if (locationPts >= 12) reasons.push(`📍 Same state — ${c.location?.state}`);
+  else if (locationPts >= 15) reasons.push(`🌍 Operates ${c.location?.operatesIn}`);
+  else if (locationPts >= 6)  reasons.push(`📍 Same country — ${c.location?.country}`);
   return reasons;
 }
 
-// ─── POST — run match engine for a user ──────────────────────────────────────
+// ─── POST — run hybrid match engine ──────────────────────────────────────────
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ userId: string }> }
@@ -136,7 +92,7 @@ export async function POST(
     await dbConnect();
     const { userId } = await params;
 
-    // 1. Load requester's business profile
+    // 1. Load User A's business profile
     const userBiz = await Business.findOne({ ownerId: userId }).lean() as any;
     if (!userBiz) {
       return NextResponse.json(
@@ -145,7 +101,27 @@ export async function POST(
       );
     }
 
-    // 2. Fetch all OTHER businesses + their owners in one aggregation
+    const needsText = [
+      ...(userBiz.needs || []),
+      userBiz.intent?.currentGoal || "",
+    ].filter(Boolean).join(", ");
+
+    if (!needsText.trim()) {
+      return NextResponse.json(
+        { msg: "Please add your needs or strategic goal to your profile to get matches.", count: 0, matches: [] },
+        { status: 200 }
+      );
+    }
+
+    // 2. Generate Gemini embedding for User A's NEEDS (1 API call)
+    let needsEmbedding: number[] = [];
+    try {
+      needsEmbedding = await generateEmbedding(needsText);
+    } catch (embErr: any) {
+      console.error("[MATCH] Gemini embedding failed, falling back to BM25 only:", embErr.message);
+    }
+
+    // 3. Fetch all OTHER businesses + their owner data
     const candidates: any[] = await Business.aggregate([
       { $match: { ownerId: { $ne: new mongoose.Types.ObjectId(userId) } } },
       {
@@ -157,7 +133,6 @@ export async function POST(
         },
       },
       { $unwind: { path: "$ownerData", preserveNullAndEmptyArrays: true } },
-      // Only active users
       { $match: { "ownerData.status": { $ne: "SUSPENDED" } } },
     ]);
 
@@ -165,105 +140,75 @@ export async function POST(
       return NextResponse.json({ count: 0, matches: [] });
     }
 
-    // 3. Batch-fetch all ratings for all candidate users in ONE query
-    const candidateUserIds = candidates.map((c: any) => c.ownerId);
-    const ratingsAgg: any[] = await Rating.aggregate([
-      { $match: { toUserId: { $in: candidateUserIds } } },
-      {
-        $group: {
-          _id: "$toUserId",
-          avgRating: { $avg: "$rating" },
-          count: { $sum: 1 },
-        },
-      },
-    ]);
-    const ratingMap = new Map<string, { avg: number; count: number }>();
-    for (const r of ratingsAgg) {
-      ratingMap.set(r._id.toString(), { avg: r.avgRating, count: r.count });
+    // 4. Fetch all candidates' pre-stored OFFERINGS embeddings in ONE query
+    const candidateOwnerIds = candidates.map((c: any) => c.ownerId);
+    const offeringDocs = await Offering.find({ userId: { $in: candidateOwnerIds } }).lean() as any[];
+    // Map userId → embedding for fast lookup
+    const embeddingMap = new Map<string, number[]>();
+    for (const od of offeringDocs) {
+      if (od.embedding?.length > 0) {
+        embeddingMap.set(od.userId.toString(), od.embedding);
+      }
     }
 
-    // 4. Build BM25 corpora
-    // Corpus A: each candidate's OFFERINGS + goal text (to match against user's NEEDS)
-    // Removed businessDescription to reduce noise (prevents hardware matching marketing if mentioned in desc)
+    // 5. Build BM25 corpus (keyword tie-breaker, and fallback for missing embeddings)
+    const myNeedTokens  = tokenize(needsText);
     const offeringCorpus = candidates.map((c: any) => {
-      const text = [
-        ...(c.offerings || []),
-        c.intent?.currentGoal || "",
-      ].join(" ");
-      return tokenize(text);
+      const parts = [
+        ...(c.offerings  || []),
+        c.industry       || "",
+        c.subIndustry    || "",
+        c.ownerData?.businessDescription || "",
+      ];
+      return tokenize(parts.join(" "));
     });
 
-    // Corpus B: each candidate's NEEDS text (to match against user's OFFERINGS)
-    const needsCorpus = candidates.map((c: any) => {
-      const text = [...(c.needs || [])].join(" ");
-      return tokenize(text);
-    });
+    const rawBm25   = bm25Score(myNeedTokens, offeringCorpus);
+    const normBm25  = normalizeBM25(rawBm25);
 
-    // User's query tokens
-    const userNeedsTokens = tokenize([...(userBiz.needs || []), userBiz.intent?.currentGoal || ""].join(" "));
-    const userOfferingTokens = tokenize([...(userBiz.offerings || [])].join(" "));
-
-    // BM25 scores — bidirectional
-    const bm25NeedsVsOfferings = bm25Score(userNeedsTokens, offeringCorpus);    // how well candidates serve MY needs
-    const bm25OfferingsVsNeeds = bm25Score(userOfferingTokens, needsCorpus);    // how well I serve their needs
-
-    // Normalise each direction independently
-    const normNeedsVsOff = normalizeBM25(bm25NeedsVsOfferings);
-    const normOffVsNeeds = normalizeBM25(bm25OfferingsVsNeeds);
-
-    // 5. Score every candidate
+    // 6. Score every candidate
     const scored: any[] = [];
+    let semanticUsed = 0;
+    let bm25Fallback = 0;
 
     for (let i = 0; i < candidates.length; i++) {
-      const c = candidates[i];
+      const c     = candidates[i];
       const owner = c.ownerData;
+      const cId   = (c.ownerId || "").toString();
 
-      // ── Intent Relevance (0–50) ───────────────────────────────────────────
-      // Weighted average: 70% "Can they help me?", 30% "Can I help them?"
-      const weightedIntent = (normNeedsVsOff[i] * 0.7) + (normOffVsNeeds[i] * 0.3);
-      const intentPts = Math.round(weightedIntent * MAX_INTENT);
+      // ── Semantic score (0–70) ─────────────────────────────────────────────
+      let semanticPts = 0;
+      const offeringEmb = embeddingMap.get(cId);
+      if (needsEmbedding.length > 0 && offeringEmb && offeringEmb.length > 0) {
+        const sim = cosineSimilarity(needsEmbedding, offeringEmb);
+        // Cosine similarity is 0–1; map to 0–70
+        // Threshold: similarity < 0.3 is too weak, treat as 0
+        semanticPts = sim >= 0.3 ? Math.round(sim * MAX_SEMANTIC) : 0;
+        semanticUsed++;
+      }
 
-      // Skip completely irrelevant candidates
-      if (intentPts < 2) continue;
+      // ── BM25 keyword score (0–10) ─────────────────────────────────────────
+      const bm25Pts = Math.round(normBm25[i] * MAX_BM25);
+
+      // Skip if both signals are zero (completely irrelevant)
+      if (semanticPts === 0 && bm25Pts < 2) continue;
+
+      // If no embedding available but BM25 is non-zero, use BM25 as proxy
+      if (semanticPts === 0 && bm25Pts > 0) bm25Fallback++;
 
       // ── Location (0–20) ───────────────────────────────────────────────────
       const locationPts = locationScore(userBiz, c);
 
-      // ── Verification (0–20) ───────────────────────────────────────────────
-      const verifyPts = verificationScore(c.trust?.verificationStatus);
-
-      // ── Reputation (0–10) ─────────────────────────────────────────────────
-      const ratingData = ratingMap.get((c.ownerId || "").toString()) ?? null;
-      const avgRating = ratingData ? ratingData.avg : null;
-      const reputationPts = reputationScore(avgRating);
-
-      // ── Profile Quality (0–5) ─────────────────────────────────────────────
-      const profilePts = profileScore(owner?.profileCompletenessScore);
-
-      // ── Subscription Bonus (0–5) ──────────────────────────────────────────
-      const planPts = subscriptionScore(owner?.subscriptionPlan);
-
       // ── Final Score ───────────────────────────────────────────────────────
-      const totalScore =
-        intentPts + locationPts + verifyPts + reputationPts + profilePts + planPts;
+      const totalScore = semanticPts + bm25Pts + locationPts;
 
       const breakdown = {
-        intentRelevance: intentPts,
+        semantic: semanticPts,
+        keywordBoost: bm25Pts,
         location: locationPts,
-        verification: verifyPts,
-        reputation: reputationPts,
-        profileQuality: profilePts,
-        subscriptionBonus: planPts,
       };
 
-      const reasons = buildReasons(
-        breakdown,
-        c,
-        owner,
-        avgRating,
-        userBiz.needs || [],
-        userBiz.offerings || [],
-      );
+      const reasons = buildReasons(semanticPts, bm25Pts, locationPts, c);
 
       scored.push({
         matchedUserId: c.ownerId,
@@ -278,9 +223,6 @@ export async function POST(
         goal: c.intent?.currentGoal || "",
         verified: owner?.verified ?? false,
         verificationStatus: c.trust?.verificationStatus || "Not Verified",
-        avgRating: avgRating ? parseFloat(avgRating.toFixed(1)) : null,
-        ratingCount: ratingData?.count ?? 0,
-        profileScore: owner?.profileCompletenessScore ?? 0,
         subscriptionPlan: owner?.subscriptionPlan || "FREE",
         score: totalScore,
         scoreBreakdown: breakdown,
@@ -288,11 +230,11 @@ export async function POST(
       });
     }
 
-    // 6. Sort descending by score, take top 20
+    // 7. Sort descending, take top 20
     scored.sort((a, b) => b.score - a.score);
     const top20 = scored.slice(0, 20);
 
-    // 7. Persist to MatchRecord (replace previous run)
+    // 8. Persist results
     await MatchRecord.deleteMany({ userId });
     if (top20.length > 0) {
       await MatchRecord.insertMany(
@@ -306,13 +248,16 @@ export async function POST(
       );
     }
 
+    console.log(`[MATCH] userId=${userId} | candidates=${candidates.length} | semantic=${semanticUsed} | bm25Fallback=${bm25Fallback} | results=${top20.length}`);
+
     return NextResponse.json({
       count: top20.length,
       matches: top20,
       meta: {
-        algorithm: "BM25-Hybrid-v1",
-        signals: ["intentRelevance", "location", "verification", "reputation", "profileQuality", "subscriptionBonus"],
-        maxScore: MAX_INTENT + MAX_LOCATION + MAX_VERIFICATION + MAX_REPUTATION + MAX_PROFILE + MAX_PLAN,
+        algorithm: "Hybrid-Gemini-BM25-v1",
+        signals: ["semantic (Gemini cosine)", "keywordBoost (BM25)", "location"],
+        semanticCoverage: `${semanticUsed}/${candidates.length} candidates had embedding`,
+        maxScore: MAX_SEMANTIC + MAX_BM25 + MAX_LOCATION,
       },
     });
 
@@ -322,7 +267,7 @@ export async function POST(
   }
 }
 
-// ─── GET — fetch cached match results for a user ─────────────────────────────
+// ─── GET — return cached match results ───────────────────────────────────────
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ userId: string }> }

@@ -4,6 +4,16 @@ import { cookies } from "next/headers";
 import connectToDatabase from "@/lib/db";
 import User from "@/models/User";
 import Business from "@/models/Business";
+import Offering from "@/models/Offering";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+
+async function generateEmbedding(text: string): Promise<number[]> {
+  const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
+  const result = await model.embedContent(text);
+  return result.embedding.values;
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || "super_secret_taplyzer_jwt_key_2026";
 
@@ -115,7 +125,23 @@ export async function POST(req: Request) {
     }
 
     // Offerings & Needs
-    if (Array.isArray(payload.offerings)) business.offerings = payload.offerings;
+    if (Array.isArray(payload.offerings)) {
+      business.offerings = payload.offerings;
+      // Auto-generate Gemini embedding for offerings (used in match engine)
+      if (payload.offerings.length > 0) {
+        try {
+          const offeringText = payload.offerings.join(", ");
+          const embedding = await generateEmbedding(offeringText);
+          await Offering.findOneAndUpdate(
+            { userId: user._id },
+            { text: offeringText, embedding },
+            { upsert: true, new: true }
+          );
+        } catch (embErr: any) {
+          console.warn("Profile POST: Offering embedding generation failed (non-fatal):", embErr.message);
+        }
+      }
+    }
     if (Array.isArray(payload.needs)) business.needs = payload.needs;
 
     // Current Intent
