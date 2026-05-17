@@ -111,7 +111,7 @@ Return a JSON array of objects with this exact structure:
 ]`;
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.5-flash",
       generationConfig: {
         responseMimeType: "application/json",
         temperature: 0.1, // Low temperature for consistent, analytical scoring
@@ -224,8 +224,8 @@ Return a JSON array of objects with this exact structure:
       matches: top20,
       meta: {
         algorithm: "Pure-AI-LLM-Judge-v1",
-        model: "gemini-1.5-flash",
-        signals: ["aiJudge (Gemini 1.5 Flash)", "location"],
+        model: "gemini-2.5-flash",
+        signals: ["aiJudge (Gemini 2.5 Flash)", "location"],
         evaluatedCandidates: candidates.length,
         maxScore: MAX_AI_SCORE + MAX_LOCATION,
       },
