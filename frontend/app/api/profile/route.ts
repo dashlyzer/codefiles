@@ -5,7 +5,9 @@ import connectToDatabase from "@/lib/db";
 import User from "@/models/User";
 import Business from "@/models/Business";
 import Offering from "@/models/Offering";
+import Need from "@/models/Need";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { denoiseText } from "@/lib/bm25";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
@@ -130,19 +132,41 @@ export async function POST(req: Request) {
       // Auto-generate Gemini embedding for offerings (used in match engine)
       if (payload.offerings.length > 0) {
         try {
-          const offeringText = payload.offerings.join(", ");
-          const embedding = await generateEmbedding(offeringText);
-          await Offering.findOneAndUpdate(
-            { userId: user._id },
-            { text: offeringText, embedding },
-            { upsert: true, new: true }
-          );
+          const rawOfferingText = payload.offerings.join(", ");
+          const cleanOfferingText = denoiseText(rawOfferingText);
+          if (cleanOfferingText.trim()) {
+            const embedding = await generateEmbedding(cleanOfferingText);
+            await Offering.findOneAndUpdate(
+              { userId: user._id },
+              { text: rawOfferingText, embedding }, // Store raw text but use clean text for embedding
+              { upsert: true, new: true }
+            );
+          }
         } catch (embErr: any) {
           console.warn("Profile POST: Offering embedding generation failed (non-fatal):", embErr.message);
         }
       }
     }
-    if (Array.isArray(payload.needs)) business.needs = payload.needs;
+    if (Array.isArray(payload.needs)) {
+      business.needs = payload.needs;
+      // Auto-generate Gemini embedding for needs (used in bidirectional match engine)
+      if (payload.needs.length > 0) {
+        try {
+          const rawNeedsText = payload.needs.join(", ");
+          const cleanNeedsText = denoiseText(rawNeedsText);
+          if (cleanNeedsText.trim()) {
+            const embedding = await generateEmbedding(cleanNeedsText);
+            await Need.findOneAndUpdate(
+              { userId: user._id },
+              { text: rawNeedsText, embedding },
+              { upsert: true, new: true }
+            );
+          }
+        } catch (embErr: any) {
+          console.warn("Profile POST: Need embedding generation failed (non-fatal):", embErr.message);
+        }
+      }
+    }
 
     // Current Intent
     if (payload.intent) {

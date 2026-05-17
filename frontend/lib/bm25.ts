@@ -42,7 +42,6 @@ const STOP_WORDS = new Set([
   "new","existing","potential","ideal","qualified","premium","high","low",
 ]);
 
-
 /**
  * Tokenise a raw string into lowercase, de-stopworded, alphanumeric tokens.
  */
@@ -53,6 +52,33 @@ export function tokenize(text: string): string[] {
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
     .filter((t) => t.length > 2 && !STOP_WORDS.has(t));
+}
+
+/**
+ * Business model noise terms that should NOT influence semantic matching.
+ * These describe HOW a company operates (go-to-market model), NOT what it
+ * actually offers or needs. Including them causes a digital marketing agency
+ * to match a steel factory simply because both selected "B2B".
+ */
+export const NOISE_TERMS = new Set([
+  "b2b","b2c","d2c","dtc","b2g","c2c",
+  "saas","paas","iaas","xaas",
+  "ecommerce","ecom","marketplace","platform",
+  "smb","sme","msme","enterprise","startup","unicorn",
+  "wholesale","retail","direct","indirect","omnichannel","multichannel",
+  "subscription","freemium","on-demand",
+  "clients","customers","users","buyers","sellers","vendors","leads",
+  "growth","scale","revenue","profit","sales","pipeline",
+  "agency","firm","group","startup","company","solutions","services",
+]);
+
+/** Strip business model noise terms from a string before embedding or tokenizing */
+export function denoiseText(text: string): string {
+  return text
+    .split(/[,\s]+/)
+    .filter(word => !NOISE_TERMS.has(word.toLowerCase().replace(/[^a-z0-9]/g, "")))
+    .join(" ")
+    .trim();
 }
 
 /**

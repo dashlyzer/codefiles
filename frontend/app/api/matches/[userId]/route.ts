@@ -4,8 +4,9 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import dbConnect from "@/lib/db";
 import Business from "@/models/Business";
 import Offering from "@/models/Offering";
+import Need from "@/models/Need";
 import MatchRecord from "@/models/MatchRecord";
-import { tokenize, bm25Score, normalizeBM25 } from "@/lib/bm25";
+import { tokenize, bm25Score, normalizeBM25, denoiseText } from "@/lib/bm25";
 
 export const dynamic = "force-dynamic";
 
@@ -25,33 +26,6 @@ async function generateEmbedding(text: string): Promise<number[]> {
   const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
   const result = await model.embedContent(text);
   return result.embedding.values;
-}
-
-/**
- * Business model noise terms that should NOT influence semantic matching.
- * These describe HOW a company operates (go-to-market model), NOT what it
- * actually offers or needs. Including them causes a digital marketing agency
- * to match a steel factory simply because both selected "B2B".
- */
-const NOISE_TERMS = new Set([
-  "b2b","b2c","d2c","dtc","b2g","c2c",
-  "saas","paas","iaas","xaas",
-  "ecommerce","ecom","marketplace","platform",
-  "smb","sme","msme","enterprise","startup","unicorn",
-  "wholesale","retail","direct","indirect","omnichannel","multichannel",
-  "subscription","freemium","on-demand",
-  "clients","customers","users","buyers","sellers","vendors","leads",
-  "growth","scale","revenue","profit","sales","pipeline",
-  "agency","firm","group","startup","company","solutions","services",
-]);
-
-/** Strip business model noise terms from a string before embedding or tokenizing */
-function denoiseText(text: string): string {
-  return text
-    .split(/[,\s]+/)
-    .filter(word => !NOISE_TERMS.has(word.toLowerCase().replace(/[^a-z0-9]/g, "")))
-    .join(" ")
-    .trim();
 }
 
 /** Cosine similarity between two equal-length vectors (returns 0–1) */
@@ -133,22 +107,35 @@ export async function POST(
       userBiz.intent?.currentGoal || "",
     ].filter(Boolean).join(", ");
 
+    const offeringText = (userBiz.offerings || []).join(", ");
+
     // Clean noise terms BEFORE embedding — prevents B2B/D2C etc. from
     // creating false cross-niche matches via semantic similarity
     const cleanNeedsText = denoiseText(needsText);
-    if (!cleanNeedsText.trim()) {
+    const cleanOfferingText = denoiseText(offeringText);
+
+    if (!cleanNeedsText.trim() && !cleanOfferingText.trim()) {
       return NextResponse.json(
-        { msg: "Please add specific needs to your profile to get matches.", count: 0, matches: [] },
+        { msg: "Please add specific needs or offerings to your profile to get matches.", count: 0, matches: [] },
         { status: 200 }
       );
     }
 
-    // 2. Generate Gemini embedding for User A's NEEDS (1 API call)
-    let needsEmbedding: number[] = [];
+    // 2. Load User A's embeddings (from DB or generate on the fly)
+    let myNeedsEmbedding: number[] = [];
+    let myOfferingEmbedding: number[] = [];
+
     try {
-      needsEmbedding = await generateEmbedding(cleanNeedsText);
+      if (cleanNeedsText.trim()) {
+        const needDoc = await Need.findOne({ userId }).lean() as any;
+        myNeedsEmbedding = needDoc?.embedding || await generateEmbedding(cleanNeedsText);
+      }
+      if (cleanOfferingText.trim()) {
+        const offerDoc = await Offering.findOne({ userId }).lean() as any;
+        myOfferingEmbedding = offerDoc?.embedding || await generateEmbedding(cleanOfferingText);
+      }
     } catch (embErr: any) {
-      console.error("[MATCH] Gemini embedding failed, falling back to BM25 only:", embErr.message);
+      console.error("[MATCH] Gemini embedding failed for User A, falling back to BM25 only:", embErr.message);
     }
 
     // 3. Fetch all OTHER businesses + their owner data
@@ -170,32 +157,43 @@ export async function POST(
       return NextResponse.json({ count: 0, matches: [] });
     }
 
-    // 4. Fetch all candidates' pre-stored OFFERINGS embeddings in ONE query
+    // 4. Fetch all candidates' pre-stored OFFERINGS and NEEDS embeddings
     const candidateOwnerIds = candidates.map((c: any) => c.ownerId);
-    const offeringDocs = await Offering.find({ userId: { $in: candidateOwnerIds } }).lean() as any[];
+    const [offeringDocs, needDocs] = await Promise.all([
+      Offering.find({ userId: { $in: candidateOwnerIds } }).lean() as Promise<any[]>,
+      Need.find({ userId: { $in: candidateOwnerIds } }).lean() as Promise<any[]>
+    ]);
+
     // Map userId → embedding for fast lookup
-    const embeddingMap = new Map<string, number[]>();
+    const offeringEmbMap = new Map<string, number[]>();
     for (const od of offeringDocs) {
-      if (od.embedding?.length > 0) {
-        embeddingMap.set(od.userId.toString(), od.embedding);
-      }
+      if (od.embedding?.length > 0) offeringEmbMap.set(od.userId.toString(), od.embedding);
     }
 
-    // 5. Build BM25 corpus (keyword tie-breaker, and fallback for missing embeddings)
-    // Apply denoiseText to strip B2B/D2C/SaaS noise from both sides
-    const myNeedTokens  = tokenize(denoiseText(needsText));
-    const offeringCorpus = candidates.map((c: any) => {
-      const parts = [
-        ...(c.offerings  || []),
-        c.industry       || "",
-        c.subIndustry    || "",
-        c.ownerData?.businessDescription || "",
-      ];
+    const needEmbMap = new Map<string, number[]>();
+    for (const nd of needDocs) {
+      if (nd.embedding?.length > 0) needEmbMap.set(nd.userId.toString(), nd.embedding);
+    }
+
+    // 5. Build BM25 corpora for bidirectional matching
+    const myNeedTokens    = tokenize(denoiseText(needsText));
+    const myOfferingTokens= tokenize(denoiseText(offeringText));
+
+    const candidateOfferingCorpus = candidates.map((c: any) => {
+      const parts = [...(c.offerings || []), c.industry || "", c.subIndustry || "", c.ownerData?.businessDescription || ""];
       return tokenize(denoiseText(parts.join(" ")));
     });
 
-    const rawBm25   = bm25Score(myNeedTokens, offeringCorpus);
-    const normBm25  = normalizeBM25(rawBm25);
+    const candidateNeedCorpus = candidates.map((c: any) => {
+      const parts = [...(c.needs || []), c.intent?.currentGoal || ""];
+      return tokenize(denoiseText(parts.join(" ")));
+    });
+
+    const rawBm25_A_Needs_B_Offers = bm25Score(myNeedTokens, candidateOfferingCorpus);
+    const rawBm25_A_Offers_B_Needs = bm25Score(myOfferingTokens, candidateNeedCorpus);
+    
+    const normBm25_A_Needs_B_Offers = normalizeBM25(rawBm25_A_Needs_B_Offers);
+    const normBm25_A_Offers_B_Needs = normalizeBM25(rawBm25_A_Offers_B_Needs);
 
     // 6. Score every candidate
     const scored: any[] = [];
@@ -207,19 +205,38 @@ export async function POST(
       const owner = c.ownerData;
       const cId   = (c.ownerId || "").toString();
 
-      // ── Semantic score (0–70) ─────────────────────────────────────────────
+      // ── Bidirectional Semantic Score (0–70) ──────────────────────────────
       let semanticPts = 0;
-      const offeringEmb = embeddingMap.get(cId);
-      if (needsEmbedding.length > 0 && offeringEmb && offeringEmb.length > 0) {
-        const sim = cosineSimilarity(needsEmbedding, offeringEmb);
-        // Cosine similarity is 0–1; map to 0–70
-        // Threshold: similarity < 0.3 is too weak, treat as 0
-        semanticPts = sim >= 0.3 ? Math.round(sim * MAX_SEMANTIC) : 0;
+      let simNeedsToOffers = 0;
+      let simOffersToNeeds = 0;
+
+      const cOfferingEmb = offeringEmbMap.get(cId);
+      const cNeedEmb = needEmbMap.get(cId);
+
+      // Direction 1: User A Needs -> Candidate Offerings
+      if (myNeedsEmbedding.length > 0 && cOfferingEmb && cOfferingEmb.length > 0) {
+        simNeedsToOffers = cosineSimilarity(myNeedsEmbedding, cOfferingEmb);
+      }
+
+      // Direction 2: User A Offerings -> Candidate Needs
+      if (myOfferingEmbedding.length > 0 && cNeedEmb && cNeedEmb.length > 0) {
+        simOffersToNeeds = cosineSimilarity(myOfferingEmbedding, cNeedEmb);
+      }
+
+      // Take the max of both directions
+      const maxSim = Math.max(simNeedsToOffers, simOffersToNeeds);
+      
+      if (maxSim >= 0.3) { // Threshold: similarity < 0.3 is too weak
+        semanticPts = Math.round(maxSim * MAX_SEMANTIC);
         semanticUsed++;
       }
 
-      // ── BM25 keyword score (0–10) ─────────────────────────────────────────
-      const bm25Pts = Math.round(normBm25[i] * MAX_BM25);
+      // ── Bidirectional BM25 keyword score (0–10) ─────────────────────────
+      const bm25_dir1 = normBm25_A_Needs_B_Offers[i];
+      const bm25_dir2 = normBm25_A_Offers_B_Needs[i];
+      const maxBm25 = Math.max(bm25_dir1, bm25_dir2);
+      
+      const bm25Pts = Math.round(maxBm25 * MAX_BM25);
 
       // Skip if both signals are zero (completely irrelevant)
       if (semanticPts === 0 && bm25Pts < 2) continue;
