@@ -66,14 +66,7 @@ export function MatchPreview() {
     <section className="py-24 lg:py-32 bg-white dark:bg-black relative transition-colors">
       <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-slate-200 dark:via-white/5 to-transparent" />
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="text-center max-w-2xl mx-auto mb-16">
-          <h2 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white sm:text-5xl text-balance">
-            See Your Potential Matches
-          </h2>
-          <p className="mt-4 text-lg text-slate-500 dark:text-white/40 font-medium">
-            Here&apos;s what your match feed could look like. Real businesses, real opportunities.
-          </p>
-        </div>
+
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {matches.map((match, index) => (
