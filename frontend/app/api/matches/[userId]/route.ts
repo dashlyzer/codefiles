@@ -3,10 +3,7 @@ import mongoose from "mongoose";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import dbConnect from "@/lib/db";
 import Business from "@/models/Business";
-import Offering from "@/models/Offering";
-import Need from "@/models/Need";
 import MatchRecord from "@/models/MatchRecord";
-import { tokenize, bm25Score, normalizeBM25, denoiseText } from "@/lib/bm25";
 
 export const dynamic = "force-dynamic";
 
@@ -14,32 +11,8 @@ export const dynamic = "force-dynamic";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 // ─── Scoring weights (max = 100) ──────────────────────────────────────────────
-// Rule: User A's NEEDS → User B's OFFERINGS
-const MAX_SEMANTIC = 70; // cosine similarity (Gemini embeddings)
-const MAX_BM25     = 10; // keyword overlap tie-breaker
-const MAX_LOCATION = 20; // geo proximity
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Generate a Gemini embedding vector for a text string */
-async function generateEmbedding(text: string): Promise<number[]> {
-  const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
-  const result = await model.embedContent(text);
-  return result.embedding.values;
-}
-
-/** Cosine similarity between two equal-length vectors (returns 0–1) */
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length || a.length === 0) return 0;
-  let dot = 0, magA = 0, magB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot  += a[i] * b[i];
-    magA += a[i] * a[i];
-    magB += b[i] * b[i];
-  }
-  const denom = Math.sqrt(magA) * Math.sqrt(magB);
-  return denom === 0 ? 0 : dot / denom;
-}
+const MAX_AI_SCORE = 80; // Gemini 1.5 Flash LLM Judge score
+const MAX_LOCATION = 20; // Geographic proximity score
 
 /** Location proximity score (0–20) */
 function locationScore(userBiz: any, c: any): number {
@@ -62,29 +35,7 @@ function locationScore(userBiz: any, c: any): number {
   return 0;
 }
 
-/** Human-readable match reasons */
-function buildReasons(
-  semanticPts: number,
-  bm25Pts: number,
-  locationPts: number,
-  c: any
-): string[] {
-  const reasons: string[] = [];
-  if (semanticPts > 0) {
-    const theyNeed = (c.needs    || []).slice(0, 2).join(", ");
-    const theyOffer= (c.offerings|| []).slice(0, 3).join(", ");
-    if (theyOffer) reasons.push(`They offer: ${theyOffer}`);
-    if (theyNeed)  reasons.push(`They need: ${theyNeed}`);
-  }
-  if (bm25Pts > 5) reasons.push("🔑 Strong keyword match");
-  if (locationPts >= 20)      reasons.push(`📍 Same city — ${c.location?.city}`);
-  else if (locationPts >= 12) reasons.push(`📍 Same state — ${c.location?.state}`);
-  else if (locationPts >= 15) reasons.push(`🌍 Operates ${c.location?.operatesIn}`);
-  else if (locationPts >= 6)  reasons.push(`📍 Same country — ${c.location?.country}`);
-  return reasons;
-}
-
-// ─── POST — run hybrid match engine ──────────────────────────────────────────
+// ─── POST — run Pure AI match engine (LLM Judge) ─────────────────────────────
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ userId: string }> }
@@ -102,43 +53,7 @@ export async function POST(
       );
     }
 
-    const needsText = [
-      ...(userBiz.needs || []),
-      userBiz.intent?.currentGoal || "",
-    ].filter(Boolean).join(", ");
-
-    const offeringText = (userBiz.offerings || []).join(", ");
-
-    // Clean noise terms BEFORE embedding — prevents B2B/D2C etc. from
-    // creating false cross-niche matches via semantic similarity
-    const cleanNeedsText = denoiseText(needsText);
-    const cleanOfferingText = denoiseText(offeringText);
-
-    if (!cleanNeedsText.trim() && !cleanOfferingText.trim()) {
-      return NextResponse.json(
-        { msg: "Please add specific needs or offerings to your profile to get matches.", count: 0, matches: [] },
-        { status: 200 }
-      );
-    }
-
-    // 2. Load User A's embeddings (from DB or generate on the fly)
-    let myNeedsEmbedding: number[] = [];
-    let myOfferingEmbedding: number[] = [];
-
-    try {
-      if (cleanNeedsText.trim()) {
-        const needDoc = await Need.findOne({ userId }).lean() as any;
-        myNeedsEmbedding = needDoc?.embedding || await generateEmbedding(cleanNeedsText);
-      }
-      if (cleanOfferingText.trim()) {
-        const offerDoc = await Offering.findOne({ userId }).lean() as any;
-        myOfferingEmbedding = offerDoc?.embedding || await generateEmbedding(cleanOfferingText);
-      }
-    } catch (embErr: any) {
-      console.error("[MATCH] Gemini embedding failed for User A, falling back to BM25 only:", embErr.message);
-    }
-
-    // 3. Fetch all OTHER businesses + their owner data
+    // 2. Fetch active candidate businesses (limit to top 60 for LLM prompt context)
     const candidates: any[] = await Business.aggregate([
       { $match: { ownerId: { $ne: new mongoose.Types.ObjectId(userId) } } },
       {
@@ -151,112 +66,108 @@ export async function POST(
       },
       { $unwind: { path: "$ownerData", preserveNullAndEmptyArrays: true } },
       { $match: { "ownerData.status": { $ne: "SUSPENDED" } } },
+      { $limit: 60 }
     ]);
 
     if (candidates.length === 0) {
       return NextResponse.json({ count: 0, matches: [] });
     }
 
-    // 4. Fetch all candidates' pre-stored OFFERINGS and NEEDS embeddings
-    const candidateOwnerIds = candidates.map((c: any) => c.ownerId);
-    const [offeringDocs, needDocs] = await Promise.all([
-      Offering.find({ userId: { $in: candidateOwnerIds } }).lean() as Promise<any[]>,
-      Need.find({ userId: { $in: candidateOwnerIds } }).lean() as Promise<any[]>
-    ]);
+    // 3. Construct JSON prompt for Gemini 1.5 Flash
+    const promptData = {
+      targetBusiness: {
+        companyName: userBiz.companyName || userBiz.brandName || "My Business",
+        industry: userBiz.industry || "",
+        offerings: userBiz.offerings || [],
+        needs: userBiz.needs || [],
+        goal: userBiz.intent?.currentGoal || "",
+      },
+      candidates: candidates.map(c => ({
+        id: c.ownerId.toString(),
+        companyName: c.companyName || c.brandName || "Unknown Candidate",
+        industry: c.industry || "",
+        offerings: c.offerings || [],
+        needs: c.needs || [],
+        goal: c.intent?.currentGoal || "",
+        description: c.ownerData?.businessDescription || "",
+      }))
+    };
 
-    // Map userId → embedding for fast lookup
-    const offeringEmbMap = new Map<string, number[]>();
-    for (const od of offeringDocs) {
-      if (od.embedding?.length > 0) offeringEmbMap.set(od.userId.toString(), od.embedding);
-    }
+    const systemInstruction = `You are an expert B2B matchmaker and AI judge. Your job is to evaluate the exact commercial synergy between a 'targetBusiness' and a list of 'candidates'.
 
-    const needEmbMap = new Map<string, number[]>();
-    for (const nd of needDocs) {
-      if (nd.embedding?.length > 0) needEmbMap.set(nd.userId.toString(), nd.embedding);
-    }
+Evaluate bidirectional synergy:
+1. Does the targetBusiness need what the candidate offers? (Target is Buyer)
+2. Does the candidate need what the targetBusiness offers? (Target is Seller)
 
-    // 5. Build BM25 corpora for bidirectional matching
-    const myNeedTokens    = tokenize(denoiseText(needsText));
-    const myOfferingTokens= tokenize(denoiseText(offeringText));
+Return a JSON array of objects with this exact structure:
+[
+  {
+    "candidateId": "string (must match candidate id precisely)",
+    "aiScore": number (0 to 80, where 80 is a perfect commercial match, 40 is moderate, 0 is no synergy),
+    "aiReason": "string (1 clear, compelling sentence explaining exactly why they match or why there is synergy)"
+  }
+]
 
-    const candidateOfferingCorpus = candidates.map((c: any) => {
-      const parts = [...(c.offerings || []), c.industry || "", c.subIndustry || "", c.ownerData?.businessDescription || ""];
-      return tokenize(denoiseText(parts.join(" ")));
+CRITICAL RULES:
+- Ignore generic labels like 'B2B', 'SaaS', 'startup', or 'clients' when scoring. Look at the actual underlying products, services, and industry alignment.
+- If they are direct competitors offering the exact same thing without complementary needs, assign aiScore: 0.
+- Ensure every candidate from the input has an entry in the output array.`;
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.1, // Low temperature for consistent, analytical scoring
+      },
+      systemInstruction,
     });
 
-    const candidateNeedCorpus = candidates.map((c: any) => {
-      const parts = [...(c.needs || []), c.intent?.currentGoal || ""];
-      return tokenize(denoiseText(parts.join(" ")));
-    });
-
-    const rawBm25_A_Needs_B_Offers = bm25Score(myNeedTokens, candidateOfferingCorpus);
-    const rawBm25_A_Offers_B_Needs = bm25Score(myOfferingTokens, candidateNeedCorpus);
+    console.log(`[MATCH] Sending ${candidates.length} candidates to Gemini 1.5 Flash Judge for userId=${userId}...`);
+    const startTime = Date.now();
     
-    const normBm25_A_Needs_B_Offers = normalizeBM25(rawBm25_A_Needs_B_Offers);
-    const normBm25_A_Offers_B_Needs = normalizeBM25(rawBm25_A_Offers_B_Needs);
+    const result = await model.generateContent(JSON.stringify(promptData));
+    const responseText = result.response.text();
+    
+    console.log(`[MATCH] Gemini response received in ${Date.now() - startTime}ms`);
 
-    // 6. Score every candidate
+    let aiEvaluations: { candidateId: string; aiScore: number; aiReason: string }[] = [];
+    try {
+      aiEvaluations = JSON.parse(responseText);
+    } catch (parseErr) {
+      console.error("[MATCH] Failed to parse Gemini JSON output:", responseText);
+      return NextResponse.json({ msg: "AI Parsing Error" }, { status: 500 });
+    }
+
+    // Map AI evaluations by candidateId for fast merging
+    const evalMap = new Map<string, { aiScore: number; aiReason: string }>();
+    for (const item of aiEvaluations) {
+      evalMap.set(item.candidateId, { aiScore: Number(item.aiScore) || 0, aiReason: item.aiReason || "" });
+    }
+
+    // 4. Merge AI scores with Location scores and format final results
     const scored: any[] = [];
-    let semanticUsed = 0;
-    let bm25Fallback = 0;
 
-    for (let i = 0; i < candidates.length; i++) {
-      const c     = candidates[i];
+    for (const c of candidates) {
       const owner = c.ownerData;
-      const cId   = (c.ownerId || "").toString();
+      const cId   = c.ownerId.toString();
+      const evaluation = evalMap.get(cId) || { aiScore: 0, aiReason: "No synergy detected." };
 
-      // ── Bidirectional Semantic Score (0–70) ──────────────────────────────
-      let semanticPts = 0;
-      let simNeedsToOffers = 0;
-      let simOffersToNeeds = 0;
-
-      const cOfferingEmb = offeringEmbMap.get(cId);
-      const cNeedEmb = needEmbMap.get(cId);
-
-      // Direction 1: User A Needs -> Candidate Offerings
-      if (myNeedsEmbedding.length > 0 && cOfferingEmb && cOfferingEmb.length > 0) {
-        simNeedsToOffers = cosineSimilarity(myNeedsEmbedding, cOfferingEmb);
-      }
-
-      // Direction 2: User A Offerings -> Candidate Needs
-      if (myOfferingEmbedding.length > 0 && cNeedEmb && cNeedEmb.length > 0) {
-        simOffersToNeeds = cosineSimilarity(myOfferingEmbedding, cNeedEmb);
-      }
-
-      // Take the max of both directions
-      const maxSim = Math.max(simNeedsToOffers, simOffersToNeeds);
-      
-      if (maxSim >= 0.3) { // Threshold: similarity < 0.3 is too weak
-        semanticPts = Math.round(maxSim * MAX_SEMANTIC);
-        semanticUsed++;
-      }
-
-      // ── Bidirectional BM25 keyword score (0–10) ─────────────────────────
-      const bm25_dir1 = normBm25_A_Needs_B_Offers[i];
-      const bm25_dir2 = normBm25_A_Offers_B_Needs[i];
-      const maxBm25 = Math.max(bm25_dir1, bm25_dir2);
-      
-      const bm25Pts = Math.round(maxBm25 * MAX_BM25);
-
-      // Skip if both signals are zero (completely irrelevant)
-      if (semanticPts === 0 && bm25Pts < 2) continue;
-
-      // If no embedding available but BM25 is non-zero, use BM25 as proxy
-      if (semanticPts === 0 && bm25Pts > 0) bm25Fallback++;
-
-      // ── Location (0–20) ───────────────────────────────────────────────────
+      const aiPts = Math.min(Math.max(evaluation.aiScore, 0), MAX_AI_SCORE);
       const locationPts = locationScore(userBiz, c);
+      const totalScore = aiPts + locationPts;
 
-      // ── Final Score ───────────────────────────────────────────────────────
-      const totalScore = semanticPts + bm25Pts + locationPts;
+      // Skip candidates with virtually no synergy
+      if (aiPts < 10) continue;
 
       const breakdown = {
-        semantic: semanticPts,
-        keywordBoost: bm25Pts,
+        aiJudgeScore: aiPts,
         location: locationPts,
       };
 
-      const reasons = buildReasons(semanticPts, bm25Pts, locationPts, c);
+      const reasons = [evaluation.aiReason];
+      if (locationPts >= 20)      reasons.push(`📍 Same city — ${c.location?.city}`);
+      else if (locationPts >= 12) reasons.push(`📍 Same state — ${c.location?.state}`);
+      else if (locationPts >= 15) reasons.push(`🌍 Operates ${c.location?.operatesIn}`);
 
       scored.push({
         matchedUserId: c.ownerId,
@@ -278,11 +189,11 @@ export async function POST(
       });
     }
 
-    // 7. Sort descending, take top 20
+    // 5. Sort descending, take top 20
     scored.sort((a, b) => b.score - a.score);
     const top20 = scored.slice(0, 20);
 
-    // 8. Persist results
+    // 6. Persist results
     await MatchRecord.deleteMany({ userId });
     if (top20.length > 0) {
       await MatchRecord.insertMany(
@@ -296,16 +207,17 @@ export async function POST(
       );
     }
 
-    console.log(`[MATCH] userId=${userId} | candidates=${candidates.length} | semantic=${semanticUsed} | bm25Fallback=${bm25Fallback} | results=${top20.length}`);
+    console.log(`[MATCH] userId=${userId} | candidates=${candidates.length} | topMatches=${top20.length}`);
 
     return NextResponse.json({
       count: top20.length,
       matches: top20,
       meta: {
-        algorithm: "Hybrid-Gemini-BM25-v1",
-        signals: ["semantic (Gemini cosine)", "keywordBoost (BM25)", "location"],
-        semanticCoverage: `${semanticUsed}/${candidates.length} candidates had embedding`,
-        maxScore: MAX_SEMANTIC + MAX_BM25 + MAX_LOCATION,
+        algorithm: "Pure-AI-LLM-Judge-v1",
+        model: "gemini-1.5-flash",
+        signals: ["aiJudge (Gemini 1.5 Flash)", "location"],
+        evaluatedCandidates: candidates.length,
+        maxScore: MAX_AI_SCORE + MAX_LOCATION,
       },
     });
 
