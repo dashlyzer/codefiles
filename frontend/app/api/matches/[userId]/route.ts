@@ -27,6 +27,33 @@ async function generateEmbedding(text: string): Promise<number[]> {
   return result.embedding.values;
 }
 
+/**
+ * Business model noise terms that should NOT influence semantic matching.
+ * These describe HOW a company operates (go-to-market model), NOT what it
+ * actually offers or needs. Including them causes a digital marketing agency
+ * to match a steel factory simply because both selected "B2B".
+ */
+const NOISE_TERMS = new Set([
+  "b2b","b2c","d2c","dtc","b2g","c2c",
+  "saas","paas","iaas","xaas",
+  "ecommerce","ecom","marketplace","platform",
+  "smb","sme","msme","enterprise","startup","unicorn",
+  "wholesale","retail","direct","indirect","omnichannel","multichannel",
+  "subscription","freemium","on-demand",
+  "clients","customers","users","buyers","sellers","vendors","leads",
+  "growth","scale","revenue","profit","sales","pipeline",
+  "agency","firm","group","startup","company","solutions","services",
+]);
+
+/** Strip business model noise terms from a string before embedding or tokenizing */
+function denoiseText(text: string): string {
+  return text
+    .split(/[,\s]+/)
+    .filter(word => !NOISE_TERMS.has(word.toLowerCase().replace(/[^a-z0-9]/g, "")))
+    .join(" ")
+    .trim();
+}
+
 /** Cosine similarity between two equal-length vectors (returns 0–1) */
 function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length || a.length === 0) return 0;
@@ -106,9 +133,12 @@ export async function POST(
       userBiz.intent?.currentGoal || "",
     ].filter(Boolean).join(", ");
 
-    if (!needsText.trim()) {
+    // Clean noise terms BEFORE embedding — prevents B2B/D2C etc. from
+    // creating false cross-niche matches via semantic similarity
+    const cleanNeedsText = denoiseText(needsText);
+    if (!cleanNeedsText.trim()) {
       return NextResponse.json(
-        { msg: "Please add your needs or strategic goal to your profile to get matches.", count: 0, matches: [] },
+        { msg: "Please add specific needs to your profile to get matches.", count: 0, matches: [] },
         { status: 200 }
       );
     }
@@ -116,7 +146,7 @@ export async function POST(
     // 2. Generate Gemini embedding for User A's NEEDS (1 API call)
     let needsEmbedding: number[] = [];
     try {
-      needsEmbedding = await generateEmbedding(needsText);
+      needsEmbedding = await generateEmbedding(cleanNeedsText);
     } catch (embErr: any) {
       console.error("[MATCH] Gemini embedding failed, falling back to BM25 only:", embErr.message);
     }
@@ -152,7 +182,8 @@ export async function POST(
     }
 
     // 5. Build BM25 corpus (keyword tie-breaker, and fallback for missing embeddings)
-    const myNeedTokens  = tokenize(needsText);
+    // Apply denoiseText to strip B2B/D2C/SaaS noise from both sides
+    const myNeedTokens  = tokenize(denoiseText(needsText));
     const offeringCorpus = candidates.map((c: any) => {
       const parts = [
         ...(c.offerings  || []),
@@ -160,7 +191,7 @@ export async function POST(
         c.subIndustry    || "",
         c.ownerData?.businessDescription || "",
       ];
-      return tokenize(parts.join(" "));
+      return tokenize(denoiseText(parts.join(" ")));
     });
 
     const rawBm25   = bm25Score(myNeedTokens, offeringCorpus);

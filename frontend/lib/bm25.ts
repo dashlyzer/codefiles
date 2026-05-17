@@ -14,14 +14,34 @@ const B  = 0.75;
 
 // Common English stop-words that add noise to matching
 const STOP_WORDS = new Set([
+  // ── English function words ────────────────────────────────────────────────
   "a","an","the","and","or","but","in","on","at","to","for","of","with",
   "by","from","as","is","are","was","were","be","been","has","have","had",
   "do","does","did","will","would","could","should","may","might","shall",
   "it","its","this","that","these","those","we","our","you","your","they",
   "their","i","my","me","us","he","she","him","her","not","no","so","if",
+
+  // ── Generic business descriptors ─────────────────────────────────────────
   "company","services","solutions","business","provide","offering","needs",
-  "looking","seeking","specializing","expert","professional","team",
+  "looking","seeking","specializing","expert","professional","team","agency",
+  "firm","group","partners","partnership","ventures","enterprise","startup",
+  "industry","sector","domain","field","space","market","segment","vertical",
+
+  // ── Business model / go-to-market labels (CROSS-NICHE NOISE) ─────────────
+  // These describe HOW a business operates, NOT what it offers.
+  // Including them causes a digital marketing agency to match a steel factory
+  // just because both selected "B2B" in their profile.
+  "b2b","b2c","d2c","dtc","b2g","saas","paas","iaas","ecommerce","ecom",
+  "marketplace","platform","subscription","enterprise","smb","sme","msme",
+  "wholesale","retail","direct","indirect","omnichannel","multichannel",
+
+  // ── Generic intent / outcome words ──────────────────────────────────────
+  "clients","customers","users","buyers","sellers","vendors","suppliers",
+  "growth","scale","revenue","profit","deals","sales","leads","pipeline",
+  "opportunities","results","outcomes","success","goals","targets","metrics",
+  "new","existing","potential","ideal","qualified","premium","high","low",
 ]);
+
 
 /**
  * Tokenise a raw string into lowercase, de-stopworded, alphanumeric tokens.
