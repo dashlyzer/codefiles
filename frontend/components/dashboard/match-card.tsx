@@ -76,23 +76,25 @@ export function MatchCard({ match, onRequestIntro }: MatchCardProps) {
         {match.scoreBreakdown && (
           <div className="mb-4 grid grid-cols-3 gap-2 px-1">
             {[
-              { label: "Intent", val: match.scoreBreakdown.intentRelevance, max: 40, color: "bg-primary" },
-              { label: "Location", val: match.scoreBreakdown.location, max: 20, color: "bg-blue-500" },
-              { label: "Trust", val: match.scoreBreakdown.verification + match.scoreBreakdown.reputation, max: 30, color: "bg-emerald-500" },
-            ].map(signal => (
+              { label: "Intent", val: (match.scoreBreakdown.intentMatch ?? match.scoreBreakdown.intentRelevance ?? 0) + (match.scoreBreakdown.semantic ?? 0), max: 50, color: "bg-primary" },
+              { label: "Location", val: match.scoreBreakdown.location ?? 0, max: 15, color: "bg-blue-500" },
+              { label: "Trust", val: match.scoreBreakdown.verification ?? 0, max: 5, color: "bg-emerald-500" },
+            ].map(signal => {
+              const percentage = signal.max > 0 ? Math.round((signal.val / signal.max) * 100) : 0;
+              return (
               <div key={signal.label} className="space-y-1">
                 <div className="flex justify-between text-[8px] font-black uppercase tracking-tighter text-slate-400">
                   <span>{signal.label}</span>
-                  <span>{Math.round((signal.val / signal.max) * 100)}%</span>
+                  <span>{percentage}%</span>
                 </div>
                 <div className="h-1 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
                   <div
                     className={`h-full ${signal.color} transition-all duration-1000`}
-                    style={{ width: `${(signal.val / signal.max) * 100}%` }}
+                    style={{ width: `${Math.min(percentage, 100)}%` }}
                   />
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
 

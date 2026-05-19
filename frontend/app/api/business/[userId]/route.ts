@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Business from "@/models/Business";
+import MatchRecord from "@/models/MatchRecord";
 
 export const dynamic = "force-dynamic";
 
@@ -24,3 +25,4 @@ export async function GET(
     return NextResponse.json({ msg: "Server Error", error: error.message }, { status: 500 });
   }
 }
+

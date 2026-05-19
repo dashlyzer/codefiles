@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import connectToDatabase from "@/lib/db";
 import User from "@/models/User";
 import Business from "@/models/Business";
+import MatchRecord from "@/models/MatchRecord";
 
 const JWT_SECRET = process.env.JWT_SECRET || "super_secret_taplyzer_jwt_key_2026";
 
@@ -154,6 +155,10 @@ export async function POST(req: Request) {
 
     await business.save();
     console.log(`Profile POST: Business saved. Score: ${business.profileScore}, Completed: ${business.isProfileCompleted}`);
+
+    // ── 4. Invalidate match cache (profile changed → matches are stale) ──
+    await MatchRecord.deleteMany({ userId: user._id });
+    console.log(`Profile POST: Match cache invalidated for user ${user.email}`);
 
     return NextResponse.json({
       message: "Profile saved successfully",

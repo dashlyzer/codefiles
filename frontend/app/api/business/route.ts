@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Business from "@/models/Business";
 import User from "@/models/User";
+import MatchRecord from "@/models/MatchRecord";
 
 export async function POST(req: Request) {
   try {
@@ -27,6 +28,9 @@ export async function POST(req: Request) {
 
     // Also update the User's lastActive status
     await User.findByIdAndUpdate(ownerId, { lastActive: new Date() });
+
+    // Invalidate match cache since profile changed
+    await MatchRecord.deleteMany({ userId: ownerId });
 
     return NextResponse.json({ msg: "Business profile saved successfully", business });
   } catch (error: any) {

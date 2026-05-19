@@ -58,7 +58,14 @@ export default function DashboardPage() {
         
         if (matchesRes.ok) {
           const matchesData = await matchesRes.json();
-          setMatches(matchesData.matches?.slice(0, 4) || []);
+          const seen = new Set<string>();
+          const deduped = (matchesData.matches || []).filter((m: any) => {
+            const id = (m.matchedUserId ?? m._id ?? "").toString();
+            if (seen.has(id)) return false;
+            seen.add(id);
+            return true;
+          });
+          setMatches(deduped.slice(0, 4));
         }
 
         if (meetingsRes.ok) {
@@ -135,9 +142,9 @@ export default function DashboardPage() {
                   </Link>
                 </div>
               ) : (
-                matches.map((match) => (
+                matches.map((match, idx) => (
                   <MatchCard 
-                    key={match.matchedUserId} 
+                    key={`${match.matchedUserId?.toString() ?? "match"}-${idx}`} 
                     match={match} 
                     onRequestIntro={() => {
                       setSelectedCompany({ 
