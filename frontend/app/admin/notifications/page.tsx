@@ -39,7 +39,7 @@ export default function AdminNotificationsPage() {
       await fetch("/api/admin/notifications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, message, audience, type, adminId: user?._id || user?.id }),
+        body: JSON.stringify({ title, message, audience, type, adminId: user?._id }),
       })
       setTitle(""); setMessage("")
       await fetchData()

@@ -84,7 +84,7 @@ export async function POST(req: Request) {
     // ── 2. Find or create Business ──
     let business = await Business.findOne({ ownerId: user._id });
     if (!business) {
-      business = new Business({ ownerId: user._id, ownerName: user.name });
+      business = await Business.create({ ownerId: user._id, ownerName: user.name });
       console.log(`Profile POST: Creating new Business document for ${user.email}`);
     }
 

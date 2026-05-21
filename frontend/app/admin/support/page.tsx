@@ -41,7 +41,7 @@ export default function AdminSupportPage() {
       await fetch("/api/admin/support", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticketId, status, adminNotes, adminId: user?._id || user?.id }),
+        body: JSON.stringify({ ticketId, status, adminNotes, adminId: user?._id }),
       })
       setExpandedId(null)
       setAdminNotes("")

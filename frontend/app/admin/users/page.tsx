@@ -55,7 +55,7 @@ export default function AdminUsersPage() {
       const res = await fetch("/api/admin/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, action, adminId: currentUser?._id || currentUser?.id }),
+        body: JSON.stringify({ userId, action, adminId: currentUser?._id }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -72,7 +72,7 @@ export default function AdminUsersPage() {
     if (!deleteTarget) return
     setActionLoading(deleteTarget.id + "delete")
     try {
-      const adminId = currentUser?._id || currentUser?.id || ""
+      const adminId = currentUser?._id || ""
       const params = new URLSearchParams({
         userId: deleteTarget.id,
         adminId,

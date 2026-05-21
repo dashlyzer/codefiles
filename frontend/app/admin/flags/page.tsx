@@ -37,7 +37,7 @@ export default function AdminFlagsPage() {
       await fetch("/api/admin/flags", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ flagId, status: "Resolved", adminNotes: "Resolved via dashboard", adminId: user?._id || user?.id }),
+        body: JSON.stringify({ flagId, status: "Resolved", adminNotes: "Resolved via dashboard", adminId: user?._id }),
       })
       await fetchData()
     } catch (e) { console.error(e) }

@@ -22,11 +22,20 @@ export interface Match {
   verified: boolean
   scoreBreakdown?: {
     intentRelevance: number
+    intentMatch?: number
+    semantic?: number
     location: number
     verification: number
     reputation: number
     profileQuality: number
     subscriptionBonus: number
+    // TargetedSynergy-v3.1 detailed metrics:
+    aNeedsMetByBOffers?: number
+    aGoalSatisfiedByBOffers?: number
+    bNeedsMetByAOffers?: number
+    bGoalSatisfiedByAOffers?: number
+    locationProximity?: number
+    profileCompleteness?: number
   }
 }
 
@@ -72,31 +81,84 @@ export function MatchCard({ match, onRequestIntro }: MatchCardProps) {
           </div>
         </div>
 
-        {/* Score Breakdown (New) */}
-        {match.scoreBreakdown && (
-          <div className="mb-4 grid grid-cols-3 gap-2 px-1">
-            {[
-              { label: "Intent", val: (match.scoreBreakdown.intentMatch ?? match.scoreBreakdown.intentRelevance ?? 0) + (match.scoreBreakdown.semantic ?? 0), max: 50, color: "bg-primary" },
-              { label: "Location", val: match.scoreBreakdown.location ?? 0, max: 15, color: "bg-blue-500" },
-              { label: "Trust", val: match.scoreBreakdown.verification ?? 0, max: 5, color: "bg-emerald-500" },
-            ].map(signal => {
-              const percentage = signal.max > 0 ? Math.round((signal.val / signal.max) * 100) : 0;
-              return (
-              <div key={signal.label} className="space-y-1">
-                <div className="flex justify-between text-[8px] font-black uppercase tracking-tighter text-slate-400">
-                  <span>{signal.label}</span>
-                  <span>{percentage}%</span>
-                </div>
-                <div className="h-1 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full ${signal.color} transition-all duration-1000`}
-                    style={{ width: `${Math.min(percentage, 100)}%` }}
-                  />
-                </div>
+        {/* Score Breakdown (v3.1) */}
+        {match.scoreBreakdown && (() => {
+          const isV3_1 = match.scoreBreakdown.aNeedsMetByBOffers !== undefined || match.scoreBreakdown.profileCompleteness !== undefined;
+          
+          const intentVal = isV3_1 
+            ? (match.scoreBreakdown.aNeedsMetByBOffers ?? 0) + 
+              (match.scoreBreakdown.aGoalSatisfiedByBOffers ?? 0) + 
+              (match.scoreBreakdown.bNeedsMetByAOffers ?? 0) + 
+              (match.scoreBreakdown.bGoalSatisfiedByAOffers ?? 0)
+            : (match.scoreBreakdown.intentMatch ?? match.scoreBreakdown.intentRelevance ?? 0) + (match.scoreBreakdown.semantic ?? 0);
+            
+          const intentMax = isV3_1 ? 80 : 50;
+          
+          const locVal = isV3_1 ? (match.scoreBreakdown.locationProximity ?? 0) : (match.scoreBreakdown.location ?? 0);
+          const locMax = isV3_1 ? 10 : 15;
+          
+          const trustVal = isV3_1
+            ? (match.scoreBreakdown.verification ?? 0) + (match.scoreBreakdown.profileCompleteness ?? 0)
+            : (match.scoreBreakdown.verification ?? 0);
+          const trustMax = isV3_1 ? 10 : 5;
+
+          return (
+            <div className="mb-4 space-y-3 px-1">
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: "Intent", val: intentVal, max: intentMax, color: "bg-primary" },
+                  { label: "Location", val: locVal, max: locMax, color: "bg-blue-500" },
+                  { label: "Trust", val: trustVal, max: trustMax, color: "bg-emerald-500" },
+                ].map(signal => {
+                  const percentage = signal.max > 0 ? Math.round((signal.val / signal.max) * 100) : 0;
+                  return (
+                    <div key={signal.label} className="space-y-1">
+                      <div className="flex justify-between text-[8px] font-black uppercase tracking-tighter text-slate-400">
+                        <span>{signal.label}</span>
+                        <span>{percentage}%</span>
+                      </div>
+                      <div className="h-1 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${signal.color} transition-all duration-1000`}
+                          style={{ width: `${Math.min(percentage, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            )})}
-          </div>
-        )}
+
+              {isV3_1 && (
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[9px] text-slate-500 dark:text-slate-400 font-bold border-t border-slate-100 dark:border-white/5 pt-2.5 transition-all">
+                  <div className="flex justify-between items-center">
+                    <span>🎯 Needs Met (A):</span>
+                    <span className="font-extrabold text-primary">{match.scoreBreakdown.aNeedsMetByBOffers}/35</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>🤝 Needs Met (B):</span>
+                    <span className="font-extrabold text-slate-600 dark:text-slate-300">{match.scoreBreakdown.bNeedsMetByAOffers}/15</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>✨ Goal Synergy (A):</span>
+                    <span className="font-extrabold text-primary">{match.scoreBreakdown.aGoalSatisfiedByBOffers}/20</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>📈 Goal Synergy (B):</span>
+                    <span className="font-extrabold text-slate-600 dark:text-slate-300">{match.scoreBreakdown.bGoalSatisfiedByAOffers}/10</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>🛡️ Verification:</span>
+                    <span className="font-extrabold text-emerald-500">{match.scoreBreakdown.verification}/5</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>📝 Completeness:</span>
+                    <span className="font-extrabold text-emerald-500">{match.scoreBreakdown.profileCompleteness}/5</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Intent Box */}
         <div className="p-4 rounded-xl md:rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 mb-4">

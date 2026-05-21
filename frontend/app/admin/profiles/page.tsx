@@ -125,7 +125,7 @@ export default function AdminProfilesPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-slate-400">{new Date(b.updatedAt).toLocaleDateString("en-IN", { month: "short", day: "numeric" })}</span>
-                          {daysOld > 30 && <AlertCircle className="h-3 w-3 text-amber-500" title="Stale intent (>30d)" />}
+                          {daysOld > 30 && <span title="Stale intent (>30d)"><AlertCircle className="h-3 w-3 text-amber-500" /></span>}
                         </div>
                       </td>
                     </tr>

@@ -60,7 +60,7 @@ export async function GET(
     }).select("_id").lean();
     const myMeetingIds = myMeetings.map((m: any) => m._id.toString());
     const ratedMeetingIds = given.map((r: any) => r.meetingId.toString());
-    const pendingMeetingIds = myMeetingIds.filter(id => !ratedMeetingIds.includes(id));
+    const pendingMeetingIds = myMeetingIds.filter((id: string) => !ratedMeetingIds.includes(id));
 
     return NextResponse.json({
       received,

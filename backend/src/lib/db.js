@@ -1,6 +1,4 @@
-import * as admin from "firebase-admin";
-
-let db: admin.firestore.Firestore;
+const admin = require("firebase-admin");
 
 if (!admin.apps.length) {
   const projectId = process.env.FIREBASE_PROJECT_ID || "taplyzer-dev";
@@ -20,19 +18,9 @@ if (!admin.apps.length) {
       projectId,
     });
   }
-  db = admin.firestore();
-  try {
-    db.settings({ ignoreUndefinedProperties: true });
-  } catch (e) {
-    console.warn("Firestore settings already initialized:", e);
-  }
-} else {
-  db = admin.firestore();
 }
 
-async function dbConnect() {
-  return db;
-}
+const db = admin.firestore();
+db.settings({ ignoreUndefinedProperties: true });
 
-export { db };
-export default dbConnect;
+module.exports = { db };

@@ -18,7 +18,7 @@ const NAV_LINKS = [
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, user } = useAuth()
   const pathname = usePathname()
   const router = useRouter()
 
@@ -76,12 +76,12 @@ export function Navbar() {
           {/* Desktop CTA buttons */}
           <div className="hidden lg:flex lg:items-center lg:gap-x-4">
             <Link
-              href="/auth?mode=login"
+              href="/auth/login"
               className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-white/40 hover:text-slate-900 dark:hover:text-white transition-colors px-3"
             >
               Log In
             </Link>
-            <Link href="/auth?mode=signup">
+            <Link href="/auth/signup">
               <Button
                 size="sm"
                 className="bg-primary hover:bg-primary/90 text-white font-black rounded-xl px-6 transition-all hover:scale-105 shadow-[0_0_20px_rgba(99,102,241,0.3)] uppercase tracking-widest text-[10px] h-10 gap-1.5"
@@ -148,27 +148,20 @@ export function Navbar() {
               ))}
             </nav>
 
-            {/* Auth buttons */}
-            <div className="px-4 py-6 border-t border-slate-100 dark:border-white/[0.07] space-y-3">
-              <Link href="/auth?mode=login" onClick={() => setMobileOpen(false)}>
-                <Button variant="outline" className="w-full h-12 rounded-xl font-black uppercase tracking-widest text-[11px] border-slate-200 dark:border-white/10">
-                  Log In
-                </Button>
-              </Link>
-              <Link href="/auth?mode=signup" onClick={() => setMobileOpen(false)}>
-                <Button className="w-full h-12 rounded-xl font-black uppercase tracking-widest text-[11px] bg-primary text-white shadow-[0_0_20px_rgba(99,102,241,0.3)] hover:scale-105 transition-all gap-2">
-                  Get Started Free
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-              {isLoggedIn && (
-                <Link href="/dashboard" onClick={() => setMobileOpen(false)}>
-                  <Button variant="ghost" className="w-full h-12 rounded-xl font-black text-primary text-[11px] uppercase tracking-widest">
-                    Go to Dashboard →
-                  </Button>
-                </Link>
-              )}
-            </div>
+             {/* Auth buttons */}
+             <div className="px-4 py-6 border-t border-slate-100 dark:border-white/[0.07] space-y-3">
+               <Link href="/auth/login" onClick={() => setMobileOpen(false)}>
+                 <Button variant="outline" className="w-full h-12 rounded-xl font-black uppercase tracking-widest text-[11px] border-slate-200 dark:border-white/10">
+                   Log In
+                 </Button>
+               </Link>
+               <Link href="/auth/signup" onClick={() => setMobileOpen(false)}>
+                 <Button className="w-full h-12 rounded-xl font-black uppercase tracking-widest text-[11px] bg-primary text-white shadow-[0_0_20px_rgba(99,102,241,0.3)] hover:scale-105 transition-all gap-2">
+                   Get Started Free
+                   <ArrowRight className="h-4 w-4" />
+                 </Button>
+               </Link>
+             </div>
           </div>
         </div>
       )}

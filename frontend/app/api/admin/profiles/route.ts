@@ -35,13 +35,13 @@ export async function GET(req: NextRequest) {
     ]);
 
     // Enrich with business data
-    const userIds = users.map((u) => u._id);
+    const userIds = users.map((u: any) => u._id);
     const businesses = await Business.find({ ownerId: { $in: userIds } })
       .select("ownerId companyName industry offerings needs intent.currentGoal isProfileCompleted");
 
-    const bizMap = new Map(businesses.map((b) => [b.ownerId.toString(), b]));
+    const bizMap = new Map<string, any>(businesses.map((b: any) => [b.ownerId.toString(), b]));
 
-    const enriched = users.map((u) => {
+    const enriched = users.map((u: any) => {
       const biz = bizMap.get(u._id.toString());
       return {
         _id: u._id,

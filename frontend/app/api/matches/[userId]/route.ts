@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import mongoose from "mongoose";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import dbConnect from "@/lib/db";
 import Business from "@/models/Business";
 import User from "@/models/User";
 import MatchRecord from "@/models/MatchRecord";
+import Offering from "@/models/Offering";
+import Intent from "@/models/Intent";
 
 export const dynamic = "force-dynamic";
 
@@ -14,100 +15,88 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 // ─── Cache TTL ────────────────────────────────────────────────────────────────
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-// ─── Stage 0: Hard Filter ────────────────────────────────────────────────────
-// Returns false for:
-//   • No directional synergy (neither side needs what the other offers)
-//   • Competitors (same industry + >60% offering overlap)
+// ─── Tokenization & Stopwords ────────────────────────────────────────────────
+const STOP_WORDS = new Set([
+  "a", "an", "the", "and", "or", "in", "on", "at", "to", "for", "with", "by",
+  "of", "is", "are", "it", "we", "you", "they", "i", "not", "no", "this", "that",
+  "our", "their", "your", "my", "us", "from", "as", "about"
+]);
 
-function tokenize(arr: string[]): string[] {
+function cleanAndTokenize(text: string | string[]): string[] {
+  const arr = Array.isArray(text) ? text : [text];
   return arr
     .join(" ")
     .toLowerCase()
     .replace(/[^a-z0-9 ]/g, " ")
     .split(/\s+/)
-    .filter(Boolean);
+    .filter((t) => t.length > 1 && !STOP_WORDS.has(t));
 }
 
-function overlapRatio(arrA: string[], arrB: string[]): number {
-  if (!arrA.length || !arrB.length) return 0;
-  const setA = new Set(arrA.map((s) => s.toLowerCase().trim()));
-  const setB = new Set(arrB.map((s) => s.toLowerCase().trim()));
-  const intersection = [...setA].filter((w) => setB.has(w));
-  const union = new Set([...setA, ...setB]);
-  return intersection.length / union.size;
+// ─── Fuzzy Similarity & Phrase Compatibility ───────────────────────────────
+
+function phraseSimilarity(phraseA: string, phraseB: string): number {
+  const pA = phraseA.toLowerCase().trim();
+  const pB = phraseB.toLowerCase().trim();
+
+  if (!pA || !pB) return 0;
+  if (pA === pB) return 1.0;
+  if (pA.includes(pB) || pB.includes(pA)) return 0.8;
+
+  const tokensA = cleanAndTokenize(pA);
+  const tokensB = cleanAndTokenize(pB);
+
+  if (!tokensA.length || !tokensB.length) return 0;
+
+  const intersection = tokensA.filter((t) => tokensB.includes(t));
+  if (intersection.length === 0) return 0;
+
+  // Fraction of tokens in phraseA that are present in phraseB
+  return intersection.length / tokensA.length;
 }
 
-function isValidMatch(A: any, B: any): boolean {
-  const aNeedsArr: string[] = A.needs || [];
-  const aOffersArr: string[] = A.offerings || [];
-  const bNeedsArr: string[] = B.needs || [];
-  const bOffersArr: string[] = B.offerings || [];
+// How well B's offerings satisfy A's needs (40% weight target)
+function computeNeedsMetByOfferingsScore(needs: string[], offerings: string[]): number {
+  if (!needs.length || !offerings.length) return 0;
 
-  // Hard filter: Both target and candidate MUST have at least 1 need, 1 offering, and a goal
-  if (!aNeedsArr.length || !aOffersArr.length || !(A.intent?.currentGoal?.trim())) return false;
-  if (!bNeedsArr.length || !bOffersArr.length || !(B.intent?.currentGoal?.trim())) return false;
-
-
-  // Direction check — at least one side must need what the other offers
-  const ANeedsBOffers = aNeedsArr.some((n) =>
-    bOffersArr.some((o) => o.toLowerCase().trim() === n.toLowerCase().trim())
-  );
-  const BNeedsAOffers = bNeedsArr.some((n) =>
-    aOffersArr.some((o) => o.toLowerCase().trim() === n.toLowerCase().trim())
-  );
-
-  if (!ANeedsBOffers && !BNeedsAOffers) return false;
-
-  // Competitor filter — same industry AND >60% offering overlap
-  if (A.industry && B.industry && A.industry.toLowerCase() === B.industry.toLowerCase()) {
-    const competitorOverlap = overlapRatio(aOffersArr, bOffersArr);
-    if (competitorOverlap > 0.6) return false;
+  let totalScore = 0;
+  for (const need of needs) {
+    let maxSim = 0;
+    for (const offering of offerings) {
+      const sim = phraseSimilarity(need, offering);
+      if (sim > maxSim) maxSim = sim;
+    }
+    totalScore += maxSim;
   }
 
-  return true;
+  return Math.round((totalScore / needs.length) * 100);
 }
 
-// ─── Stage 1: BM25-Style Keyword Similarity ──────────────────────────────────
-// Score 0–100: how much do their needs+offerings vocabularies overlap?
+// How well B's offerings satisfy A's strategic goal (20% weight target)
+function computeGoalSatisfiedByOfferingsScore(goal: string, offerings: string[]): number {
+  if (!goal || !offerings.length) return 0;
+  const cleanGoal = goal.toLowerCase().trim();
 
-function basicSimilarity(A: any, B: any): number {
-  const textA = tokenize([...(A.needs || []), ...(A.offerings || [])]);
-  const textB = tokenize([...(B.needs || []), ...(B.offerings || [])]);
-
-  if (!textA.length || !textB.length) return 0;
-
-  const setA = new Set(textA);
-  const setB = new Set(textB);
-  const intersection = [...setA].filter((w) => setB.has(w));
-
-  // Asymmetric: how much of A's vocab does B satisfy?
-  return Math.round((intersection.length / setA.size) * 100);
-}
-
-// ─── Stage 2: Deterministic Weighted Score ───────────────────────────────────
-
-/** 35 pts — directional needs↔offerings intent match */
-function intentMatchScore(A: any, B: any): number {
-  const aNeedsArr: string[] = A.needs || [];
-  const aOffersArr: string[] = A.offerings || [];
-  const bNeedsArr: string[] = B.needs || [];
-  const bOffersArr: string[] = B.offerings || [];
-
-  let matchedTerms = 0;
-  let totalTerms = aNeedsArr.length + bNeedsArr.length;
-  if (totalTerms === 0) return 0;
-
-  for (const n of aNeedsArr) {
-    if (bOffersArr.some((o) => o.toLowerCase().trim() === n.toLowerCase().trim())) matchedTerms++;
-  }
-  for (const n of bNeedsArr) {
-    if (aOffersArr.some((o) => o.toLowerCase().trim() === n.toLowerCase().trim())) matchedTerms++;
+  let maxSim = 0;
+  for (const offering of offerings) {
+    const cleanOffering = offering.toLowerCase().trim();
+    let sim = 0;
+    if (cleanGoal.includes(cleanOffering) || cleanOffering.includes(cleanGoal)) {
+      sim = 1.0;
+    } else {
+      const tokensOff = cleanAndTokenize(cleanOffering);
+      const tokensGoal = cleanAndTokenize(cleanGoal);
+      if (tokensOff.length > 0) {
+        const intersection = tokensOff.filter((t) => tokensGoal.includes(t));
+        sim = intersection.length / tokensOff.length;
+      }
+    }
+    if (sim > maxSim) maxSim = sim;
   }
 
-  return Math.round((matchedTerms / totalTerms) * 100);
+  return Math.round(maxSim * 100);
 }
 
-/** 15 pts — geographic proximity */
+// ─── Geographic Proximity Score (15% weight target) ─────────────────────────
 function locationScore(A: any, B: any): number {
   const norm = (s?: string) => (s || "").toLowerCase().trim();
 
@@ -119,8 +108,8 @@ function locationScore(A: any, B: any): number {
   const bState = norm(B.location?.state);
   const bCountry = norm(B.location?.country);
 
-  if (aCity && bCity && aCity === bCity) return 100;       // same city
-  if (aState && bState && aState === bState) return 70;    // same state
+  if (aCity && bCity && aCity === bCity) return 100;           // same city
+  if (aState && bState && aState === bState) return 70;        // same state
   if (aCountry && bCountry && aCountry === bCountry) return 40; // same country
 
   // Reach bonus
@@ -131,64 +120,147 @@ function locationScore(A: any, B: any): number {
   return 10; // different country, no special reach
 }
 
-/** 10 pts — industry fit (penalise cross-industry mismatch, reward same sector) */
-function businessFitScore(A: any, B: any): number {
+// ─── Strict Competitor Filter ────────────────────────────────────────────────
+function isCompetitor(A: any, B: any): boolean {
+  const aOffersArr: string[] = A.offerings || [];
+  const bOffersArr: string[] = B.offerings || [];
+
+  if (aOffersArr.length === 0 || bOffersArr.length === 0) return false;
+
   const aInd = (A.industry || "").toLowerCase().trim();
   const bInd = (B.industry || "").toLowerCase().trim();
-  if (!aInd || !bInd) return 50; // unknown — neutral
-  if (aInd === bInd) return 80;  // same sector, still relevant (complementary roles)
-  return 40;                     // cross-industry — valid but less contextual
-}
 
-/** 10 pts — profile completeness (50%) + intent freshness (50%) */
-function intentQualityScore(B: any, bUser: any): number {
-  let score = 0;
-
-  // ── Profile Completeness (max 50 pts) ─────────────────────────────────────
-  // Each missing field penalises the candidate's rank.
-  if (B.companyName && B.companyName.trim().length > 0) score += 10; // has company name
-  if (B.industry   && B.industry.trim().length   > 0) score += 10;   // has industry
-  if (B.location?.city && B.location.city.trim().length > 0) score += 10; // has city
-  if ((B.offerings || []).length >= 2) score += 10;                   // 2+ offerings
-  if ((B.needs     || []).length >= 2) score += 10;                   // 2+ needs
-
-  // ── Intent Freshness (max 50 pts) ─────────────────────────────────────────
-  if (B.intent?.currentGoal && B.intent.currentGoal.trim().length > 0) score += 25;
-  if (bUser?.intentLastUpdated) {
-    const daysSinceUpdate =
-      (Date.now() - new Date(bUser.intentLastUpdated).getTime()) / (1000 * 60 * 60 * 24);
-    if (daysSinceUpdate < 7)  score += 25; // updated this week
-    else if (daysSinceUpdate < 30) score += 15; // updated this month
-    else if (daysSinceUpdate < 90) score += 5;  // updated this quarter
+  // 1. Exact case-insensitive offering match
+  const setA = new Set(aOffersArr.map((s) => s.toLowerCase().trim()));
+  const setB = new Set(bOffersArr.map((s) => s.toLowerCase().trim()));
+  for (const item of setA) {
+    if (setB.has(item)) {
+      return true; // Shares an exact offering phrase -> direct competitor!
+    }
   }
 
-  return score; // 0–100, weighted at 10% of final score = 0–10 pts
+  // 2. Tokenized word overlap
+  const tokensA = cleanAndTokenize(aOffersArr);
+  const tokensB = cleanAndTokenize(bOffersArr);
+  if (tokensA.length === 0 || tokensB.length === 0) return false;
+
+  const setTokensA = new Set(tokensA);
+  const setTokensB = new Set(tokensB);
+
+  const intersection = [...setTokensA].filter((t) => setTokensB.has(t));
+  if (intersection.length > 0) {
+    // If in the same industry and share ANY offering token, they are competitors
+    if (aInd && bInd && aInd === bInd) {
+      return true;
+    }
+
+    // If they share more than 20% of their offering tokens (Jaccard similarity), they are competitors
+    const union = new Set([...setTokensA, ...setTokensB]);
+    const overlap = intersection.length / union.size;
+    if (overlap > 0.20) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
+// ─── Profile Enrichment Helper ────────────────────────────────────────────────
+function enrichProfile(biz: any, offeringsMap: Map<string, string>, intentsMap: Map<string, string>) {
+  if (!biz) return biz;
 
-/** 10 pts — how recently the candidate was active */
-function activityScore(bUser: any): number {
-  if (!bUser?.lastActive) return 10;
-  const daysSince =
-    (Date.now() - new Date(bUser.lastActive).getTime()) / (1000 * 60 * 60 * 24);
-  if (daysSince < 1) return 100;
-  if (daysSince < 7) return 80;
-  if (daysSince < 30) return 50;
-  if (daysSince < 90) return 25;
-  return 10;
+  const ownerId = biz.ownerId?.toString();
+  if (!ownerId) return biz;
+
+  let offerings = Array.isArray(biz.offerings) ? [...biz.offerings] : [];
+  let needs = Array.isArray(biz.needs) ? [...biz.needs] : [];
+
+  // Fallback offerings if they contain only generic values or are empty
+  const isGenericOff = offerings.length === 0 || 
+    (offerings.length === 1 && (offerings[0] === "Service" || offerings[0] === "Services"));
+  if (isGenericOff) {
+    const richOff = offeringsMap.get(ownerId);
+    if (richOff) {
+      offerings = richOff.split(",").map(s => s.trim()).filter(Boolean);
+    }
+  }
+
+  // Fallback needs if they contain only generic values or are empty
+  const isGenericNeed = needs.length === 0 || 
+    (needs.length === 1 && (needs[0] === "Client" || needs[0] === "Clients" || needs[0] === "Customer" || needs[0] === "Customers"));
+  if (isGenericNeed) {
+    const richIntent = intentsMap.get(ownerId) || biz.intent?.currentGoal;
+    if (richIntent) {
+      needs = [richIntent];
+    }
+  }
+
+  return {
+    ...biz,
+    offerings,
+    needs
+  };
 }
 
-/** 5 pts — verification tier */
-function verificationScore(bUser: any, bBiz: any): number {
-  if (bUser?.verified) return 100;
-  const status = bBiz?.trust?.verificationStatus || "Not Verified";
-  if (status === "Trusted Partner") return 90;
-  if (status === "Business Verified") return 70;
-  if (status === "Basic Verified") return 50;
-  return 30;
+// ─── Hard Validation Filter ──────────────────────────────────────────────────
+function isValidMatch(A: any, B: any): boolean {
+  const aNeedsArr: string[] = A.needs || [];
+  const aOffersArr: string[] = A.offerings || [];
+  const bNeedsArr: string[] = B.needs || [];
+  const bOffersArr: string[] = B.offerings || [];
+
+  // Hard filter: Both target and candidate MUST have at least 1 need, 1 offering, and a goal
+  if (!aNeedsArr.length || !aOffersArr.length || !(A.intent?.currentGoal?.trim())) return false;
+  if (!bNeedsArr.length || !bOffersArr.length || !(B.intent?.currentGoal?.trim())) return false;
+
+  // Strict competitor filter
+  if (isCompetitor(A, B)) return false;
+
+  // Direction check — A needs B's offerings OR A's goal is satisfied by B's offerings OR B needs A's offerings
+  const aNeedsMet = computeNeedsMetByOfferingsScore(aNeedsArr, bOffersArr);
+  const bNeedsMet = computeNeedsMetByOfferingsScore(bNeedsArr, aOffersArr);
+  const aGoalMet = computeGoalSatisfiedByOfferingsScore(A.intent.currentGoal, bOffersArr);
+
+  if (aNeedsMet === 0 && bNeedsMet === 0 && aGoalMet === 0) {
+    return false;
+  }
+
+  return true;
 }
 
-/** Final weighted composite — 0 to 100 */
+// ─── Helper Functions for Verification & Completeness ──────────────────────
+function getVerificationScore(candidateUser: any, B: any): number {
+  const status = (B.trust?.verificationStatus || "").trim().toLowerCase();
+  
+  if (status === "trusted partner") return 100;
+  if (status === "business verified" || candidateUser?.verified === true) return 80;
+  if (status === "basic verified" || status === "basic") return 60;
+  if (status === "verified user") return 80;
+  if (status === "not verified" || status === "") return 20;
+
+  return 20;
+}
+
+function getProfileCompletenessScore(candidateUser: any, B: any): number {
+  if (typeof B.profileScore === "number") {
+    return B.profileScore;
+  }
+
+  // Fallback completeness calculation matching profile/route.ts
+  let score = 0;
+  if (candidateUser?.name && candidateUser?.phone) score += 15;
+  if (B.companyName && B.industry) score += 15;
+  if (B.location?.country && B.location?.city) score += 10;
+  if (B.strength?.teamSize) score += 5;
+  if (B.offerings && B.offerings.length > 0) score += 15;
+  if (B.needs && B.needs.length > 0) score += 15;
+  if (B.intent && B.intent.currentGoal) score += 15;
+  if (B.trust && B.trust.website) score += 10;
+
+  return Math.min(score, 100);
+}
+
+// ─── TargetedSynergy-v3.1 Scoring Engine ────────────────────────────────────
 function computeDeterministicScore(
   userBiz: any,
   candidate: any,
@@ -196,43 +268,54 @@ function computeDeterministicScore(
 ): {
   total: number;
   breakdown: {
-    intentMatch: number;
-    semantic: number;
-    location: number;
-    businessFit: number;
-    intentQuality: number;
-    activity: number;
+    aNeedsMetByBOffers: number;
+    aGoalSatisfiedByBOffers: number;
+    bNeedsMetByAOffers: number;
+    bGoalSatisfiedByAOffers: number;
+    locationProximity: number;
     verification: number;
+    profileCompleteness: number;
+    intentRelevance: number;
+    location: number;
   };
 } {
-  const intent   = intentMatchScore(userBiz, candidate);    // 0–100
-  const semantic = basicSimilarity(userBiz, candidate);      // 0–100
-  const location = locationScore(userBiz, candidate);        // 0–100
-  const fit      = businessFitScore(userBiz, candidate);     // 0–100
-  const quality  = intentQualityScore(candidate, candidateUser); // 0–100
-  const activity = activityScore(candidateUser);             // 0–100
-  const verify   = verificationScore(candidateUser, candidate); // 0–100
+  const aNeedsMetByBOffers = computeNeedsMetByOfferingsScore(userBiz.needs || [], candidate.offerings || []);
+  const aGoalSatisfiedByBOffers = computeGoalSatisfiedByOfferingsScore(userBiz.intent?.currentGoal || "", candidate.offerings || []);
+
+  const bNeedsMetByAOffers = computeNeedsMetByOfferingsScore(candidate.needs || [], userBiz.offerings || []);
+  const bGoalSatisfiedByAOffers = computeGoalSatisfiedByOfferingsScore(candidate.intent?.currentGoal || "", userBiz.offerings || []);
+
+  const locationProximity = locationScore(userBiz, candidate); // Returns 0-100
+  const verification = getVerificationScore(candidateUser, candidate); // Returns 0-100
+  const profileCompleteness = getProfileCompletenessScore(candidateUser, candidate); // Returns 0-100
 
   const total = Math.round(
-    intent   * 0.35 +
-    semantic * 0.15 +
-    location * 0.15 +
-    fit      * 0.10 +
-    quality  * 0.10 +
-    activity * 0.10 +
-    verify   * 0.05
+    aNeedsMetByBOffers      * 0.35 +
+    aGoalSatisfiedByBOffers * 0.20 +
+    bNeedsMetByAOffers      * 0.15 +
+    bGoalSatisfiedByAOffers * 0.10 +
+    locationProximity       * 0.10 +
+    verification            * 0.05 +
+    profileCompleteness     * 0.05
   );
 
   return {
     total,
     breakdown: {
-      intentMatch:   Math.round(intent   * 0.35),
-      semantic:      Math.round(semantic * 0.15),
-      location:      Math.round(location * 0.15),
-      businessFit:   Math.round(fit      * 0.10),
-      intentQuality: Math.round(quality  * 0.10),
-      activity:      Math.round(activity * 0.10),
-      verification:  Math.round(verify   * 0.05),
+      aNeedsMetByBOffers: Math.round(aNeedsMetByBOffers * 0.35),
+      aGoalSatisfiedByBOffers: Math.round(aGoalSatisfiedByBOffers * 0.20),
+      bNeedsMetByAOffers: Math.round(bNeedsMetByAOffers * 0.15),
+      bGoalSatisfiedByAOffers: Math.round(bGoalSatisfiedByAOffers * 0.10),
+      locationProximity: Math.round(locationProximity * 0.10),
+      verification: Math.round(verification * 0.05),
+      profileCompleteness: Math.round(profileCompleteness * 0.05),
+      intentRelevance: Math.round(
+        aNeedsMetByBOffers      * 0.35 +
+        aGoalSatisfiedByBOffers * 0.20 +
+        bNeedsMetByAOffers      * 0.15 +
+        bGoalSatisfiedByAOffers * 0.10
+      ),
+      location: Math.round(locationProximity * 0.10),
     },
   };
 }
@@ -281,33 +364,44 @@ Industry target: ${userBiz.industry} | Industry candidate: ${item.industry}`;
 function buildReasons(
   userBiz: any,
   candidate: any,
-  breakdown: ReturnType<typeof computeDeterministicScore>["breakdown"],
+  breakdown: any,
   aiReason?: string
 ): string[] {
   const reasons: string[] = [];
 
-  // Intent match
+  // 1. Direct need satisfaction
   const matchedNeeds = (userBiz.needs || []).filter((n: string) =>
-    (candidate.offerings || []).some((o: string) => o.toLowerCase() === n.toLowerCase())
+    (candidate.offerings || []).some((o: string) => phraseSimilarity(n, o) > 0.5)
   );
-  const matchedOffers = (candidate.needs || []).filter((n: string) =>
-    (userBiz.offerings || []).some((o: string) => o.toLowerCase() === n.toLowerCase())
-  );
-
-  if (matchedNeeds.length > 0)
+  if (matchedNeeds.length > 0) {
     reasons.push(`🎯 They offer what you need: ${matchedNeeds.slice(0, 2).join(", ")}`);
-  if (matchedOffers.length > 0)
+  }
+
+  // 2. Goal satisfaction
+  const goalSim = computeGoalSatisfiedByOfferingsScore(userBiz.intent?.currentGoal || "", candidate.offerings || []);
+  if (goalSim > 50) {
+    reasons.push(`✨ Matches your strategic goal: "${userBiz.intent.currentGoal}"`);
+  }
+
+  // 3. Mutual need satisfaction
+  const matchedOffers = (candidate.needs || []).filter((n: string) =>
+    (userBiz.offerings || []).some((o: string) => phraseSimilarity(n, o) > 0.5)
+  );
+  if (matchedOffers.length > 0) {
     reasons.push(`🤝 They need what you offer: ${matchedOffers.slice(0, 2).join(", ")}`);
+  }
 
-  // Location
-  if (breakdown.location >= Math.round(100 * 0.15))
-    reasons.push(`📍 Same city — ${candidate.location?.city || ""}`);
-  else if (breakdown.location >= Math.round(70 * 0.15))
-    reasons.push(`📍 Same state — ${candidate.location?.state || ""}`);
-
-  // Verification
-  if (breakdown.verification >= Math.round(70 * 0.05))
-    reasons.push("✅ Verified business");
+  // 4. Location
+  if (breakdown.locationProximity > 0) {
+    const locScore = breakdown.locationProximity / 0.15; // get raw score back
+    if (locScore >= 100) {
+      reasons.push(`📍 Same city — ${candidate.location?.city || ""}`);
+    } else if (locScore >= 70) {
+      reasons.push(`📍 Same state — ${candidate.location?.state || ""}`);
+    } else if (locScore >= 40) {
+      reasons.push(`📍 Same country — ${candidate.location?.country || ""}`);
+    }
+  }
 
   // AI reason (if rerank ran)
   if (aiReason) reasons.push(`🤖 ${aiReason}`);
@@ -325,18 +419,42 @@ export async function POST(
     const { userId } = await params;
 
     // ── Load User A's profile ─────────────────────────────────────────────────
-    const userBiz = await Business.findOne({ ownerId: userId }).lean() as any;
-    if (!userBiz) {
+    const rawUserBiz = await Business.findOne({ ownerId: userId }).lean() as any;
+    if (!rawUserBiz) {
       return NextResponse.json(
         { msg: "Business profile not found. Please complete your profile first." },
         { status: 404 }
       );
     }
 
+    // Fetch rich offerings and intents from Firestore to enrich the profiles
+    const [allOfferings, allIntents] = await Promise.all([
+      Offering.find({}).exec() as Promise<any[]>,
+      Intent.find({}).exec() as Promise<any[]>
+    ]);
+
+    // Create lookup maps by userId
+    const offeringsMap = new Map<string, string>();
+    const intentsMap = new Map<string, string>();
+
+    for (const off of allOfferings) {
+      if (off.userId && off.text) {
+        offeringsMap.set(off.userId.toString(), off.text);
+      }
+    }
+    for (const intent of allIntents) {
+      if (intent.userId && intent.text) {
+        intentsMap.set(intent.userId.toString(), intent.text);
+      }
+    }
+
+    // Enrich User A's profile
+    const userBiz = enrichProfile(rawUserBiz, offeringsMap, intentsMap);
+
     // ── Stage 0+1: Candidate Retrieval with Hard Filter ───────────────────────
     // Fetch all active users' businesses (excluding self + suspended)
     const candidates: any[] = await Business.aggregate([
-      { $match: { ownerId: { $ne: new mongoose.Types.ObjectId(userId) } } },
+      { $match: { ownerId: { $ne: userId } } },
       {
         $lookup: {
           from: "users",
@@ -353,19 +471,21 @@ export async function POST(
       return NextResponse.json({ count: 0, matches: [], meta: { fromCache: false } });
     }
 
+    // Enrich all candidate profiles using lookup maps
+    const enrichedCandidates = candidates.map(c => {
+      const enriched = enrichProfile(c, offeringsMap, intentsMap);
+      return {
+        ...enriched,
+        ownerData: c.ownerData
+      };
+    });
+
     // Stage 0: Hard filter — direction + competitor check
-    const filtered = candidates.filter((c) => isValidMatch(userBiz, c));
+    const filtered = enrichedCandidates.filter((c) => isValidMatch(userBiz, c));
     console.log(`[MATCH] userId=${userId} | total=${candidates.length} | after hard filter=${filtered.length}`);
 
-    // Stage 1: BM25 pre-score to get top 50 candidates
-    const prescored = filtered
-      .map((c) => ({ c, pre: basicSimilarity(userBiz, c) }))
-      .sort((a, b) => b.pre - a.pre)
-      .slice(0, 50)
-      .map((x) => x.c);
-
-    // ── Stage 2: Deterministic Scoring ───────────────────────────────────────
-    const scored = prescored
+    // Stage 1: Score all filtered non-competitor candidates directly using the composite formula
+    const scored = filtered
       .map((c) => {
         const user = c.ownerData;
         const { total, breakdown } = computeDeterministicScore(userBiz, c, user);
@@ -470,11 +590,18 @@ export async function POST(
       matches: formattedMatches,
       meta: {
         fromCache: false,
-        algorithm: "StableHybrid-v2",
-        signals: ["intentMatch(35%)", "semantic(15%)", "location(15%)", "businessFit(10%)", "intentQuality(10%)", "activity(10%)", "verification(5%)"],
+        algorithm: "TargetedSynergy-v3.1",
+        signals: [
+          "aNeedsMetByBOffers(35%)",
+          "aGoalSatisfiedByBOffers(20%)",
+          "bNeedsMetByAOffers(15%)",
+          "bGoalSatisfiedByAOffers(10%)",
+          "locationProximity(10%)",
+          "verification(5%)",
+          "profileCompleteness(5%)"
+        ],
         aiRerankEnabled: process.env.GEMINI_RERANK_ENABLED === "true",
         evaluatedCandidates: filtered.length,
-        prescreenedCandidates: prescored.length,
       },
     });
 

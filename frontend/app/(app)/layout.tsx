@@ -4,7 +4,8 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { 
   LayoutDashboard, Users, MessageSquare, Calendar, Star, 
-  UserCircle, LogOut, Zap, Menu, X, Settings, Sun, Moon
+  UserCircle, LogOut, Zap, Menu, X, Settings, Sun, Moon,
+  ShieldCheck
 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
@@ -36,8 +37,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
+    if (!user) return
+
     const isSetupComplete = localStorage.getItem("taplyzer_setup_complete") === "true"
-    if (!isSetupComplete && pathname !== "/profile/setup" && user?.role !== "SUPER_ADMIN" && user?.role !== "ADMIN") {
+    if (!isSetupComplete && pathname !== "/profile/setup") {
       router.push("/profile/setup")
     }
   }, [pathname, router, user])
@@ -99,6 +102,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 truncate">{user?.email || "user@example.com"}</span>
               </div>
             </div>
+            {user?.email === "admin@taplyser.com" && (
+              <Button
+                variant="outline"
+                onClick={() => router.push("/admin")}
+                className="w-full flex items-center justify-start gap-3 px-4 py-3 h-auto rounded-xl font-bold border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 transition-all text-sm mb-2 text-primary"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                Control Room
+              </Button>
+            )}
             <Button
               variant="ghost"
               onClick={logOut}
@@ -127,6 +140,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <span className="text-[9px] font-black uppercase tracking-widest text-primary">Status</span>
               <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-wider">Verified</span>
             </div>
+
+            {user?.email === "admin@taplyser.com" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push("/admin")}
+                className="flex items-center gap-1.5 h-9 rounded-xl font-black uppercase tracking-widest text-[9px] text-primary border-primary/20 hover:bg-primary/5 mr-1"
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Control Room
+              </Button>
+            )}
 
             {/* Dark Mode */}
             <button

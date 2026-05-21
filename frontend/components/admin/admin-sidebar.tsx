@@ -183,17 +183,19 @@ export function AdminSidebar() {
 
       {/* ── Bottom ── */}
       <div className="px-2 py-3 border-t border-slate-100 dark:border-white/5 space-y-0.5 shrink-0">
-        <Link
-          href="/dashboard"
-          title={collapsed ? "User Mode" : undefined}
-          className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-bold text-slate-500 dark:text-white/40 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-all",
-            collapsed && "justify-center px-2"
-          )}
-        >
-          <Settings className="h-4 w-4 shrink-0" />
-          {!collapsed && <span>User Mode</span>}
-        </Link>
+        {user?.email === "admin@taplyser.com" && (
+          <Link
+            href="/dashboard"
+            title={collapsed ? "User Mode" : undefined}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-bold text-slate-500 dark:text-white/40 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-all",
+              collapsed && "justify-center px-2"
+            )}
+          >
+            <Settings className="h-4 w-4 shrink-0" />
+            {!collapsed && <span>User Mode</span>}
+          </Link>
+        )}
         <button
           onClick={logOut}
           className={cn(

@@ -69,11 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(data.user)
       setIsLoggedIn(true)
 
-      if (data.user.role === "SUPER_ADMIN" || data.user.role === "ADMIN") {
-        router.push("/admin")
-      } else {
-        router.push("/profile")
-      }
+      router.push("/profile")
     } catch (err: any) {
       setIsLoading(false)
       throw err
@@ -100,11 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(data.user)
       setIsLoggedIn(true)
 
-      if (data.user.role === "SUPER_ADMIN") {
-        router.push("/admin")
-      } else {
-        router.push("/profile/setup")
-      }
+      router.push("/profile/setup")
     } catch (err: any) {
       setIsLoading(false)
       throw err

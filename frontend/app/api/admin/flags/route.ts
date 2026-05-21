@@ -3,7 +3,6 @@ import dbConnect from "@/lib/db";
 import Flag from "@/models/Flag";
 import User from "@/models/User";
 import AdminLog from "@/models/AdminLog";
-import { getServerSession } from "next-auth";
 
 export const dynamic = "force-dynamic";
 

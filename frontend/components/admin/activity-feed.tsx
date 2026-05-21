@@ -48,7 +48,7 @@ function timeAgo(date: Date): string {
   return `${Math.floor(hrs / 24)}d ago`
 }
 
-export function AdminActivityFeed() {
+export function AdminActivityFeed({ limit }: { limit?: number } = {}) {
   const [events, setEvents] = useState<ActivityEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState(new Date())
@@ -111,7 +111,7 @@ export function AdminActivityFeed() {
             No recent activity
           </div>
         ) : (
-          events.map((event, i) => {
+          (limit ? events.slice(0, limit) : events).map((event, i) => {
             const config = eventConfig[event.type] || {
               label: event.type,
               icon: CheckCircle2,

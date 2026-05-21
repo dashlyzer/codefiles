@@ -42,7 +42,7 @@ export default function AdminContentPage() {
       await fetch("/api/admin/content", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: activeTab, title, subtitle, ctaText, ctaLink, adminId: user?._id || user?.id }),
+        body: JSON.stringify({ type: activeTab, title, subtitle, ctaText, ctaLink, adminId: user?._id }),
       })
       setTitle(""); setSubtitle(""); setCtaText(""); setCtaLink("")
       await fetchData()
@@ -53,7 +53,7 @@ export default function AdminContentPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this item?")) return
     try {
-      await fetch(`/api/admin/content?id=${id}&adminId=${user?._id || user?.id}`, { method: "DELETE" })
+      await fetch(`/api/admin/content?id=${id}&adminId=${user?._id}`, { method: "DELETE" })
       await fetchData()
     } catch (e) { console.error(e) }
   }
@@ -63,7 +63,7 @@ export default function AdminContentPage() {
       await fetch("/api/admin/content", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: id, isActive: !current, adminId: user?._id || user?.id }),
+        body: JSON.stringify({ itemId: id, isActive: !current, adminId: user?._id }),
       })
       await fetchData()
     } catch (e) { console.error(e) }

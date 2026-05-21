@@ -52,7 +52,7 @@ export default function AdminMeetingsPage() {
       await fetch("/api/admin/meetings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ meetingId, action: "UPDATE_OUTCOME", payload: { outcome }, adminId: user?._id || user?.id }),
+        body: JSON.stringify({ meetingId, action: "UPDATE_OUTCOME", payload: { outcome }, adminId: user?._id }),
       })
       await fetchData()
     } catch (e) { console.error(e) }

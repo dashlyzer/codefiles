@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, Suspense } from "react"
-import { useSearchParams } from "next/navigation"
+import { useState, Suspense, useEffect } from "react"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
-import { Zap, Mail, Lock, User, ArrowLeft, Loader2, Eye, EyeOff } from "lucide-react"
+import { Zap, Mail, Lock, User, ArrowLeft, ArrowRight, Loader2, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
@@ -12,10 +12,30 @@ import { useAuth } from "@/components/auth-provider"
 
 function AuthContent() {
   const searchParams = useSearchParams()
-  const mode = searchParams.get("mode") || "signin"
+  const pathname = usePathname()
+  const rawMode = pathname.includes("/signup") 
+    ? "signup" 
+    : pathname.includes("/login") 
+      ? "signin" 
+      : (searchParams.get("mode") || "signin")
+  const mode = rawMode === "login" ? "signin" : rawMode
+  
   const [activeTab, setActiveTab] = useState(mode)
   const [isLoading, setIsLoading] = useState(false)
-  const { signIn, signUp } = useAuth()
+  const { signIn, signUp, user, isLoading: authLoading, logOut } = useAuth()
+  const router = useRouter()
+
+  const [hasCheckedInitAuth, setHasCheckedInitAuth] = useState(false)
+  const [isAlreadyLoggedIn, setIsAlreadyLoggedIn] = useState(false)
+
+  useEffect(() => {
+    if (!authLoading && !hasCheckedInitAuth) {
+      if (user) {
+        setIsAlreadyLoggedIn(true)
+      }
+      setHasCheckedInitAuth(true)
+    }
+  }, [authLoading, user, hasCheckedInitAuth])
 
   // Shared fields
   const [email, setEmail] = useState("")
@@ -67,6 +87,76 @@ function AuthContent() {
 
   const inputCls = "pl-11 h-12 bg-slate-100/50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white rounded-xl focus-visible:ring-primary/20 font-medium"
   const labelCls = "text-[10px] font-black text-slate-400 dark:text-white/40 uppercase tracking-[0.2em] ml-1"
+
+  if (isAlreadyLoggedIn && user) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-black flex flex-col items-center justify-center p-6 sm:p-8 transition-colors">
+        {/* Back to Home */}
+        <Link
+          href="/"
+          className="absolute top-8 left-8 flex items-center gap-2 text-sm font-black text-slate-400 dark:text-white/40 hover:text-slate-900 dark:hover:text-white transition-all uppercase tracking-widest"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Site
+        </Link>
+
+        <div className="w-full max-w-[440px] space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+          {/* Brand Logo */}
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="h-14 w-14 rounded-2xl bg-primary flex items-center justify-center shadow-[0_0_30px_rgba(3,169,244,0.4)]">
+              <Zap className="h-8 w-8 text-white fill-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Taplyzer</h1>
+              <p className="text-sm font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest mt-1">Intent-Based Networking</p>
+            </div>
+          </div>
+
+          <Card className="border-slate-200 dark:border-white/10 bg-white/50 dark:bg-[#0A0A0A] backdrop-blur-xl shadow-2xl rounded-[32px] overflow-hidden">
+            <CardContent className="p-8 sm:p-10 space-y-6">
+              <div className="text-center space-y-2 mb-4">
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Already Signed In</h2>
+                <p className="text-sm text-slate-500 dark:text-white/40 font-medium leading-relaxed">
+                  You are currently signed in to Taplyzer.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-100/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center font-black text-primary flex-shrink-0">
+                  {user.name?.[0] || "U"}
+                </div>
+                <div className="flex flex-col overflow-hidden text-left">
+                  <span className="font-black text-sm text-slate-900 dark:text-white truncate">{user.name}</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 truncate">{user.email}</span>
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <Button
+                  onClick={() => router.push("/dashboard")}
+                  className="w-full h-14 bg-primary hover:bg-primary/90 text-white font-black rounded-2xl shadow-[0_0_20px_rgba(3,169,244,0.3)] transition-all flex items-center justify-center gap-2"
+                >
+                  Go to Dashboard
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    await logOut()
+                    setIsAlreadyLoggedIn(false)
+                  }}
+                  className="w-full h-14 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-white font-black rounded-2xl transition-all"
+                >
+                  Sign Out / Use Another Account
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-black flex flex-col items-center justify-center p-6 sm:p-8 transition-colors">
