@@ -57,6 +57,7 @@ export default function ProfilePage() {
       // Tags
       offerings: ["SEO", "Paid Ads"],
       needs: ["Clients"],
+      offeringGoal: "",
       // Goal
       currentGoal: "Need 5 monthly clients in Bangalore this quarter.",
       goalType: "Need Clients", goalTimeline: "Within 1 month", goalPriority: "High", goalIndustry: "E-commerce", goalLocation: "Bangalore",
@@ -87,6 +88,7 @@ export default function ProfilePage() {
                   teamSize: data.strength?.teamSize || "1-5",
                   offerings: data.offerings || [],
                   needs: data.needs || [],
+                  offeringGoal: data.offeringGoal || "",
                   currentGoal: data.intent?.currentGoal || "",
                   goalPriority: data.intent?.priority || "Medium",
                   budget: data.intent?.budget || "",
@@ -133,6 +135,7 @@ export default function ProfilePage() {
             },
             offerings: merged.offerings,
             needs: merged.needs,
+            offeringGoal: merged.offeringGoal,
             intent: {
                currentGoal: merged.currentGoal,
                priority: merged.goalPriority,
@@ -295,10 +298,18 @@ export default function ProfilePage() {
                   <Button onClick={() => setIsEditOfferingsOpen(true)} variant="outline" className="font-black uppercase tracking-widest text-[10px] h-8 px-4 rounded-lg border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5">Edit Offerings</Button>
                </div>
                {profileData.offerings.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                     {profileData.offerings.map((tag: string) => (
-                        <Badge key={tag} className="bg-slate-100 text-slate-700 dark:bg-white/5 dark:text-slate-300 border border-slate-200 dark:border-white/10 px-4 py-2 font-bold text-sm rounded-xl">{tag}</Badge>
-                     ))}
+                  <div className="space-y-4">
+                     <div className="flex flex-wrap gap-2">
+                        {profileData.offerings.map((tag: string) => (
+                           <Badge key={tag} className="bg-slate-100 text-slate-700 dark:bg-white/5 dark:text-slate-300 border border-slate-200 dark:border-white/10 px-4 py-2 font-bold text-sm rounded-xl">{tag}</Badge>
+                        ))}
+                     </div>
+                     {profileData.offeringGoal && (
+                        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-white/5">
+                           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Offering Goal</p>
+                           <p className="text-sm font-bold text-slate-600 dark:text-slate-300 italic leading-relaxed">"{profileData.offeringGoal}"</p>
+                        </div>
+                     )}
                   </div>
                ) : <p className="text-sm font-bold text-slate-400 border-2 border-dashed border-slate-100 dark:border-white/5 rounded-2xl p-6 text-center">No offerings added.</p>}
             </div>
@@ -328,9 +339,10 @@ export default function ProfilePage() {
                type={isEditOfferingsOpen ? "offerings" : "needs"}
                industry={profileData.industry}
                currentTags={isEditOfferingsOpen ? profileData.offerings : profileData.needs}
+               offeringGoal={isEditOfferingsOpen ? profileData.offeringGoal : ""}
                onClose={() => { setIsEditOfferingsOpen(false); setIsEditNeedsOpen(false) }}
-               onSave={(tags: string[]) => {
-                  updateData(isEditOfferingsOpen ? { offerings: tags } : { needs: tags })
+               onSave={(tags: string[], offGoal?: string) => {
+                  updateData(isEditOfferingsOpen ? { offerings: tags, offeringGoal: offGoal } : { needs: tags })
                   setIsEditOfferingsOpen(false); setIsEditNeedsOpen(false);
                   toast.success("Tags updated successfully")
                }}
@@ -369,13 +381,15 @@ interface TagEditorModalProps {
    type: "offerings" | "needs";
    industry: string;
    currentTags: string[];
+   offeringGoal?: string;
    onClose: () => void;
-   onSave: (tags: string[]) => void;
+   onSave: (tags: string[], offeringGoal?: string) => void;
 }
 
-function TagEditorModal({ type, industry, currentTags, onClose, onSave }: TagEditorModalProps) {
+function TagEditorModal({ type, industry, currentTags, offeringGoal = "", onClose, onSave }: TagEditorModalProps) {
    const [tags, setTags] = useState<string[]>(currentTags)
    const [input, setInput] = useState("")
+   const [offGoal, setOffGoal] = useState(offeringGoal)
 
    const isOfferings = type === "offerings"
    const suggestions = INDUSTRY_SUGGESTIONS[industry]?.[type] || DEFAULT_SUGGESTIONS[type]
@@ -387,6 +401,10 @@ function TagEditorModal({ type, industry, currentTags, onClose, onSave }: TagEdi
    }
 
    const handleRemove = (tag: string) => setTags(tags.filter(t => t !== tag))
+
+   const countWords = (str: string) => {
+      return str.trim() === "" ? 0 : str.trim().split(/\s+/).length
+   }
 
    return (
       <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
@@ -423,9 +441,28 @@ function TagEditorModal({ type, industry, currentTags, onClose, onSave }: TagEdi
                      ))}
                   </div>
                </div>
+
+               {isOfferings && (
+                  <div className="pt-4 border-t border-slate-100 dark:border-white/5 space-y-2">
+                     <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Offering Goal (Max 60 words)</label>
+                        <span className="text-[10px] font-bold text-slate-400">{countWords(offGoal)}/60 words</span>
+                     </div>
+                     <Textarea
+                        value={offGoal}
+                        onChange={e => {
+                           if (countWords(e.target.value) <= 60 || e.target.value.length < offGoal.length) {
+                              setOffGoal(e.target.value)
+                           }
+                        }}
+                        placeholder="Define what you specifically hope to achieve with these offerings..."
+                        className="min-h-[80px] bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 font-bold rounded-xl resize-none text-sm"
+                     />
+                  </div>
+               )}
             </div>
             <div className="p-6 border-t border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/[0.02] flex justify-end">
-               <Button onClick={() => onSave(tags)} className="bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest text-[10px] h-12 px-8 rounded-xl w-full">Save Tags</Button>
+               <Button onClick={() => onSave(tags, isOfferings ? offGoal : undefined)} className="bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest text-[10px] h-12 px-8 rounded-xl w-full">Save Tags</Button>
             </div>
          </div>
       </div>

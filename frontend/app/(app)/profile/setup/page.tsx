@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
-import { Zap, ArrowLeft, ChevronRight, X, Phone, ShieldCheck, Check } from "lucide-react"
+import { Zap, ArrowLeft, ChevronRight, X, Phone, ShieldCheck, Check, HelpCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -22,6 +22,7 @@ type FormData = {
   businessType: string; customBusinessType: string; teamSize: string
   country: string; state: string; city: string; pincode: string; address: string
   offerings: string[]; needs: string[]
+  offeringGoal: string
   goal: string; budget: string; timeline: string
 }
 
@@ -31,12 +32,101 @@ const DEFAULT_FORM: FormData = {
   businessType: "", customBusinessType: "", teamSize: "1-5",
   country: "India", state: "", city: "", pincode: "", address: "",
   offerings: [], needs: [],
+  offeringGoal: "",
   goal: "", budget: "", timeline: ""
 }
 
 const inputCls = "h-14 bg-slate-50 dark:bg-white/5 border-none rounded-2xl font-bold"
 const labelCls = "text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1"
 const selectCls = "w-full h-14 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl font-bold px-4 text-sm text-slate-900 dark:text-white outline-none cursor-pointer"
+
+const FIELD_INFOS: Record<string, { title: string; desc: string; tip: string }> = {
+  companyName: {
+    title: "Company Name",
+    desc: "The registered name of your business or the brand name you operate under.",
+    tip: "e.g., 'Acme Softworks' or 'Zenith Marketing'."
+  },
+  role: {
+    title: "Your Role / Designation",
+    desc: "Your official role or position in the company that represents your authority.",
+    tip: "e.g., 'CEO', 'Founder', 'Director of Sales'."
+  },
+  companyPhone: {
+    title: "Company Mobile Number",
+    desc: "The primary phone number for your business operations. Used for verification.",
+    tip: "Do not include country code (+91). Enter 10 digits."
+  },
+  industry: {
+    title: "Industry",
+    desc: "The sector in which your business operates. This helps filter relevant matches.",
+    tip: "If your sector isn't listed, choose 'Other' and specify."
+  },
+  businessType: {
+    title: "Business Type",
+    desc: "The specific operational category of your business.",
+    tip: "e.g., 'Agency' if you provide services, 'Manufacturer' if you make physical goods."
+  },
+  teamSize: {
+    title: "Team Size",
+    desc: "The size of your workforce. Helps match with partners of appropriate scale.",
+    tip: "Choose the range representing full-time employees."
+  },
+  country: {
+    title: "Country",
+    desc: "The country where your business headquarter or primary office is located.",
+    tip: "e.g., 'India', 'United States'."
+  },
+  state: {
+    title: "State",
+    desc: "The state, province, or territory of your headquarters.",
+    tip: "e.g., 'Maharashtra', 'Karnataka', 'California'."
+  },
+  city: {
+    title: "City",
+    desc: "The city where your business operations are based.",
+    tip: "Crucial for local/hyperlocal matching and proximity scores."
+  },
+  pincode: {
+    title: "Pincode / ZIP",
+    desc: "The postal code of your company's physical address.",
+    tip: "Used for precise location computations."
+  },
+  address: {
+    title: "Company Address",
+    desc: "The physical office address, suite, or building name of your business.",
+    tip: "Ensures legitimacy during manual verification reviews."
+  },
+  offerings: {
+    title: "Offerings",
+    desc: "Keywords representing products, services, or skills your business provides.",
+    tip: "Use suggestions or add custom tags like 'SEO', 'Mobile App Development'."
+  },
+  offeringGoal: {
+    title: "Offering Goal",
+    desc: "A brief pitch (max 60 words) describing your primary services and value proposition.",
+    tip: "Be concise. Visible directly in matching cards in place of strategic goals."
+  },
+  needs: {
+    title: "Market Needs",
+    desc: "Keywords representing services, resources, or partners you are looking for.",
+    tip: "This is matched against other businesses' offerings."
+  },
+  goal: {
+    title: "Strategic Goal",
+    desc: "Your primary business objective or deal you want to close right now.",
+    tip: "e.g., 'Looking for a B2B sales partner in Mumbai this quarter'."
+  },
+  budget: {
+    title: "Minimum Budget",
+    desc: "The minimum financial scale of the target deal/partnership.",
+    tip: "e.g., '₹5L - ₹25L' or 'No Budget Constraint'."
+  },
+  timeline: {
+    title: "Required By",
+    desc: "The timeframe within which you expect to achieve this strategic goal.",
+    tip: "Select the closest deadline for starting/completing the project."
+  }
+}
 
 export default function ProfileSetupPage() {
   const router = useRouter()
@@ -47,6 +137,7 @@ export default function ProfileSetupPage() {
   const [tagInput, setTagInput] = useState("")
   const [isInitializing, setIsInitializing] = useState(true)
   const [showVerifyPopup, setShowVerifyPopup] = useState(false)
+  const [activeHelp, setActiveHelp] = useState<string | null>(null)
 
   const set = (key: keyof FormData, value: any) =>
     setFormData(prev => ({ ...prev, [key]: value }))
@@ -70,6 +161,7 @@ export default function ProfileSetupPage() {
               state: data.location?.state || "", city: data.location?.city || "",
               pincode: data.location?.pincode || "", address: data.location?.address || "",
               offerings: data.offerings || [], needs: data.needs || [],
+              offeringGoal: data.offeringGoal || "",
               goal: data.intent?.currentGoal || "",
               budget: data.intent?.budget || "", timeline: data.intent?.timeline || ""
             })
@@ -95,6 +187,7 @@ export default function ProfileSetupPage() {
     location: { country: formData.country, state: formData.state, city: formData.city, pincode: formData.pincode, address: formData.address, operatesIn: "National" },
     strength: { teamSize: formData.teamSize },
     offerings: formData.offerings, needs: formData.needs,
+    offeringGoal: formData.offeringGoal,
     intent: { currentGoal: formData.goal, budget: formData.budget, timeline: formData.timeline },
     isProfileCompleted: false
   })
@@ -143,6 +236,32 @@ export default function ProfileSetupPage() {
     if (formData.industry) suggestions.push(`Expanding our ${formData.industry} business network.`)
     const base = INDUSTRY_SUGGESTIONS[formData.industry]?.goals || DEFAULT_SUGGESTIONS.goals
     return Array.from(new Set([...suggestions, ...base])).slice(0, 3)
+  }
+
+  const renderHelpIcon = (field: string) => (
+    <button
+      type="button"
+      onClick={() => setActiveHelp(activeHelp === field ? null : field)}
+      className={`p-1 rounded-full transition-all shrink-0 ${
+        activeHelp === field 
+          ? "text-primary bg-primary/10" 
+          : "text-slate-400 hover:text-slate-600 dark:hover:text-white"
+      }`}
+    >
+      <HelpCircle className="h-3.5 w-3.5" />
+    </button>
+  )
+
+  const renderHelpText = (field: string) => {
+    const info = FIELD_INFOS[field]
+    if (!info || activeHelp !== field) return null
+    return (
+      <div className="p-4 bg-blue-50/70 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-2xl text-xs text-blue-900 dark:text-blue-300 font-bold space-y-1 mt-1.5 mb-2 animate-in slide-in-from-top-2 duration-300">
+        <p className="font-extrabold uppercase tracking-wider text-[9px] text-blue-600 dark:text-blue-400">💡 {info.title} Guidance</p>
+        <p className="font-medium text-slate-600 dark:text-slate-400 leading-relaxed">{info.desc}</p>
+        <p className="text-[10px] font-medium italic text-slate-500 mt-1">{info.tip}</p>
+      </div>
+    )
   }
 
   return (
@@ -220,15 +339,27 @@ export default function ProfileSetupPage() {
               </div>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className={labelCls}>Company Name</label>
+                  <div className="flex items-center gap-1.5">
+                    <label className={labelCls}>Company Name</label>
+                    {renderHelpIcon("companyName")}
+                  </div>
+                  {renderHelpText("companyName")}
                   <Input value={formData.companyName} onChange={e => set("companyName", e.target.value)} placeholder="Acme Softworks" className={inputCls} />
                 </div>
                 <div className="space-y-2">
-                  <label className={labelCls}>Your Role / Designation</label>
+                  <div className="flex items-center gap-1.5">
+                    <label className={labelCls}>Your Role / Designation</label>
+                    {renderHelpIcon("role")}
+                  </div>
+                  {renderHelpText("role")}
                   <Input value={formData.role} onChange={e => set("role", e.target.value)} placeholder="CEO / Founder / Director" className={inputCls} />
                 </div>
                 <div className="space-y-2">
-                  <label className={labelCls}>Company Mobile Number</label>
+                  <div className="flex items-center gap-1.5">
+                    <label className={labelCls}>Company Mobile Number</label>
+                    {renderHelpIcon("companyPhone")}
+                  </div>
+                  {renderHelpText("companyPhone")}
                   <div className="relative">
                     <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <Input
@@ -242,7 +373,11 @@ export default function ProfileSetupPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className={labelCls}>Industry</label>
+                    <div className="flex items-center gap-1.5">
+                      <label className={labelCls}>Industry</label>
+                      {renderHelpIcon("industry")}
+                    </div>
+                    {renderHelpText("industry")}
                     <select value={formData.industry} onChange={e => { set("industry", e.target.value); set("businessType", ""); set("customIndustry", "") }} className={selectCls}>
                       <option value="" disabled>Select Industry</option>
                       {INDUSTRIES.map(ind => <option key={ind} value={ind}>{ind}</option>)}
@@ -253,7 +388,11 @@ export default function ProfileSetupPage() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <label className={labelCls}>Business Type</label>
+                    <div className="flex items-center gap-1.5">
+                      <label className={labelCls}>Business Type</label>
+                      {renderHelpIcon("businessType")}
+                    </div>
+                    {renderHelpText("businessType")}
                     <select value={formData.businessType} onChange={e => { set("businessType", e.target.value); set("customBusinessType", "") }} className={selectCls} disabled={!formData.industry}>
                       <option value="" disabled>{formData.industry ? "Select Type" : "Select Industry first"}</option>
                       {businessTypeOptions.map(t => <option key={t} value={t}>{t}</option>)}
@@ -264,7 +403,11 @@ export default function ProfileSetupPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className={labelCls}>Team Size</label>
+                  <div className="flex items-center gap-1.5">
+                    <label className={labelCls}>Team Size</label>
+                    {renderHelpIcon("teamSize")}
+                  </div>
+                  {renderHelpText("teamSize")}
                   <div className="flex flex-wrap gap-2">
                     {["1-5", "6-20", "21-50", "51-200", "201+"].map(size => (
                       <button key={size} onClick={() => set("teamSize", size)}
@@ -286,26 +429,46 @@ export default function ProfileSetupPage() {
               </div>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className={labelCls}>Country</label>
+                  <div className="flex items-center gap-1.5">
+                    <label className={labelCls}>Country</label>
+                    {renderHelpIcon("country")}
+                  </div>
+                  {renderHelpText("country")}
                   <Input value={formData.country} onChange={e => set("country", e.target.value)} className={inputCls} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className={labelCls}>State</label>
+                    <div className="flex items-center gap-1.5">
+                      <label className={labelCls}>State</label>
+                      {renderHelpIcon("state")}
+                    </div>
+                    {renderHelpText("state")}
                     <Input value={formData.state} onChange={e => set("state", e.target.value)} placeholder="Maharashtra" className={inputCls} />
                   </div>
                   <div className="space-y-2">
-                    <label className={labelCls}>City</label>
+                    <div className="flex items-center gap-1.5">
+                      <label className={labelCls}>City</label>
+                      {renderHelpIcon("city")}
+                    </div>
+                    {renderHelpText("city")}
                     <Input value={formData.city} onChange={e => set("city", e.target.value)} placeholder="Mumbai" className={inputCls} />
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2 col-span-1">
-                    <label className={labelCls}>Pincode</label>
+                    <div className="flex items-center gap-1.5">
+                      <label className={labelCls}>Pincode</label>
+                      {renderHelpIcon("pincode")}
+                    </div>
+                    {renderHelpText("pincode")}
                     <Input value={formData.pincode} onChange={e => set("pincode", e.target.value)} placeholder="400001" className={inputCls} />
                   </div>
                   <div className="space-y-2 col-span-2">
-                    <label className={labelCls}>Company Address</label>
+                    <div className="flex items-center gap-1.5">
+                      <label className={labelCls}>Company Address</label>
+                      {renderHelpIcon("address")}
+                    </div>
+                    {renderHelpText("address")}
                     <Input value={formData.address} onChange={e => set("address", e.target.value)} placeholder="Office 402, Business Park" className={inputCls} />
                   </div>
                 </div>
@@ -321,9 +484,16 @@ export default function ProfileSetupPage() {
                 <p className="text-slate-500 font-medium">What products or services do you provide?</p>
               </div>
               <div className="space-y-6">
-                <div className="flex gap-2">
-                  <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={e => e.key === "Enter" && addTag("offerings")} placeholder="e.g. Cloud Security, AI Development" className={inputCls} />
-                  <Button onClick={() => addTag("offerings")} className="h-14 px-8 rounded-2xl bg-primary text-white font-black uppercase tracking-widest text-[10px]">Add</Button>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <label className={labelCls}>Add Offerings</label>
+                    {renderHelpIcon("offerings")}
+                  </div>
+                  {renderHelpText("offerings")}
+                  <div className="flex gap-2">
+                    <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={e => e.key === "Enter" && addTag("offerings")} placeholder="e.g. Cloud Security, AI Development" className={inputCls} />
+                    <Button onClick={() => addTag("offerings")} className="h-14 px-8 rounded-2xl bg-primary text-white font-black uppercase tracking-widest text-[10px]">Add</Button>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {formData.offerings.map(tag => (
@@ -346,6 +516,27 @@ export default function ProfileSetupPage() {
                     })}
                   </div>
                 </div>
+
+                {/* Offering Goal Text Field */}
+                <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-white/5">
+                  <div className="flex items-center gap-1.5">
+                    <label className={labelCls}>Offering Goal (Max 60 words)</label>
+                    {renderHelpIcon("offeringGoal")}
+                  </div>
+                  {renderHelpText("offeringGoal")}
+                  <Textarea
+                    value={formData.offeringGoal}
+                    onChange={e => {
+                      if (countWords(e.target.value) <= 60 || e.target.value.length < formData.offeringGoal.length) set("offeringGoal", e.target.value)
+                    }}
+                    placeholder="Describe your offerings and value proposition in less than 60 words..."
+                    className="min-h-[100px] bg-slate-50 dark:bg-white/5 border-none rounded-2xl font-bold text-base p-4 resize-none"
+                  />
+                  <div className="flex justify-between items-center px-1 mt-1">
+                    <span className="text-[10px] font-bold text-slate-400">{countWords(formData.offeringGoal)}/60 words</span>
+                  </div>
+                </div>
+
               </div>
             </div>
           )}
@@ -358,9 +549,16 @@ export default function ProfileSetupPage() {
                 <p className="text-slate-500 font-medium">What are you currently looking for from partners?</p>
               </div>
               <div className="space-y-6">
-                <div className="flex gap-2">
-                  <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={e => e.key === "Enter" && addTag("needs")} placeholder="e.g. Marketing Agency, Supply Chain Partner" className={inputCls} />
-                  <Button onClick={() => addTag("needs")} className="h-14 px-8 rounded-2xl bg-primary text-white font-black uppercase tracking-widest text-[10px]">Add</Button>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <label className={labelCls}>Add Needs</label>
+                    {renderHelpIcon("needs")}
+                  </div>
+                  {renderHelpText("needs")}
+                  <div className="flex gap-2">
+                    <Input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={e => e.key === "Enter" && addTag("needs")} placeholder="e.g. Marketing Agency, Supply Chain Partner" className={inputCls} />
+                    <Button onClick={() => addTag("needs")} className="h-14 px-8 rounded-2xl bg-primary text-white font-black uppercase tracking-widest text-[10px]">Add</Button>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {formData.needs.map(tag => (
@@ -376,7 +574,7 @@ export default function ProfileSetupPage() {
                       const isSelected = formData.needs.includes(s)
                       return (
                         <Badge key={s} onClick={() => toggleTag("needs", s)} variant={isSelected ? "default" : "outline"}
-                          className={`cursor-pointer px-3 py-1.5 font-bold text-[10px] rounded-lg transition-all ${isSelected ? "bg-emerald-500 text-white border-emerald-500 shadow-sm shadow-emerald-500/20" : "border-slate-200 dark:border-white/10 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600"}`}>
+                          className={`cursor-pointer px-3 py-1.5 font-bold text-[10px] rounded-lg transition-all ${isSelected ? "bg-emerald-50 text-white border-emerald-500 shadow-sm shadow-emerald-500/20" : "border-slate-200 dark:border-white/10 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600"}`}>
                           {isSelected ? "✓" : "+"} {s}
                         </Badge>
                       )
@@ -395,7 +593,12 @@ export default function ProfileSetupPage() {
                 <p className="text-slate-500 font-medium">What is the primary deal or partnership you are actively pursuing?</p>
               </div>
               <div className="space-y-4">
-                <div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <label className={labelCls}>Strategic Goal (Max 60 words)</label>
+                    {renderHelpIcon("goal")}
+                  </div>
+                  {renderHelpText("goal")}
                   <Textarea
                     value={formData.goal}
                     onChange={e => {
@@ -419,11 +622,19 @@ export default function ProfileSetupPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className={labelCls}>Minimum Budget</label>
+                    <div className="flex items-center gap-1.5">
+                      <label className={labelCls}>Minimum Budget</label>
+                      {renderHelpIcon("budget")}
+                    </div>
+                    {renderHelpText("budget")}
                     <Input value={formData.budget} onChange={e => set("budget", e.target.value)} placeholder="₹5L – ₹25L" className={inputCls} />
                   </div>
                   <div className="space-y-2">
-                    <label className={labelCls}>Required By</label>
+                    <div className="flex items-center gap-1.5">
+                      <label className={labelCls}>Required By</label>
+                      {renderHelpIcon("timeline")}
+                    </div>
+                    {renderHelpText("timeline")}
                     <select value={formData.timeline} onChange={e => set("timeline", e.target.value)} className={selectCls}>
                       <option value="" disabled>Select deadline</option>
                       <option value="Less than 7 Days">Less than 7 Days</option>

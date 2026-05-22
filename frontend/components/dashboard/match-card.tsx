@@ -18,6 +18,7 @@ export interface Match {
   offerings: string[]
   needs: string[]
   goal: string
+  offeringGoal?: string
   reasons: string[]
   verified: boolean
   scoreBreakdown?: {
@@ -164,10 +165,10 @@ export function MatchCard({ match, onRequestIntro }: MatchCardProps) {
         <div className="p-4 rounded-xl md:rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 mb-4">
           <div className="flex items-center gap-2 mb-2">
             <Target className="h-3 w-3 text-primary" />
-            <span className="text-[9px] font-black uppercase tracking-widest text-primary">Strategic Goal</span>
+            <span className="text-[9px] font-black uppercase tracking-widest text-primary">Offering Goal</span>
           </div>
           <p className="text-slate-600 dark:text-slate-400 font-medium text-xs leading-relaxed italic mb-4">
-            "{match.goal || 'Looking for mutually beneficial business opportunities.'}"
+            "{match.offeringGoal || match.goal || 'Looking for mutually beneficial business opportunities.'}"
           </p>
 
           <div className="grid grid-cols-1 gap-3 mt-4 pt-3 border-t border-slate-200/50 dark:border-white/5">
